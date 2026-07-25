@@ -16,8 +16,8 @@ export function DashboardLoading() {
           </div>
         ))}
       </div>
-      <div className="grid gap-4 2xl:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, index) => (
+      <div className="grid gap-4 xl:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
             className="rounded-2xl border border-white/[0.055] bg-card/80 p-6"
