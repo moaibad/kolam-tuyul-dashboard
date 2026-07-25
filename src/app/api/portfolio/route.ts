@@ -1,0 +1,36 @@
+import { NextRequest } from "next/server";
+
+import {
+  getLivePortfolio,
+  InvalidWalletAddressError,
+} from "@/server/portfolio-service";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const portfolio = await getLivePortfolio(
+      request.nextUrl.searchParams.get("address") ?? "",
+    );
+    return Response.json(portfolio, {
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    if (error instanceof InvalidWalletAddressError) {
+      return Response.json(
+        { error: error.message },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    console.error("Live portfolio request failed", error);
+    return Response.json(
+      {
+        error:
+          "Live portfolio data could not be loaded from Robinhood Chain. Please try again.",
+      },
+      { status: 502, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+}
