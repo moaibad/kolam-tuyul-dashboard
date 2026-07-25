@@ -17,7 +17,7 @@ import type {
   TokenAmount,
 } from "@/lib/types";
 
-const ROBINHOOD_RPC_URL = "https://rpc.mainnet.chain.robinhood.com";
+const DEFAULT_ROBINHOOD_RPC_URL = "https://rpc.mainnet.chain.robinhood.com";
 const USDG_ADDRESS = getAddress(
   "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
 );
@@ -26,6 +26,28 @@ const WETH_ADDRESS = getAddress(
 );
 
 export class InvalidWalletAddressError extends Error {}
+
+let databasePromise: Promise<StateDatabase> | undefined;
+
+function getDatabase() {
+  if (!databasePromise) {
+    databasePromise = (async () => {
+      const url = process.env.TURSO_DATABASE_URL;
+      const authToken = process.env.TURSO_AUTH_TOKEN;
+      if (!url || !authToken) {
+        throw new Error(
+          "TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be configured.",
+        );
+      }
+      const database = new StateDatabase(url, authToken);
+      return database;
+    })().catch((error) => {
+      databasePromise = undefined;
+      throw error;
+    });
+  }
+  return databasePromise;
+}
 
 export function parseWalletAddress(value: string | null): Address {
   const trimmed = value?.trim() ?? "";
@@ -41,27 +63,22 @@ export async function getLivePortfolio(
   const walletAddress = parseWalletAddress(walletAddressInput);
   const config: AppConfig = {
     walletAddress,
-    robinhoodRpcUrl: ROBINHOOD_RPC_URL,
+    robinhoodRpcUrl:
+      process.env.ROBINHOOD_RPC_URL ?? DEFAULT_ROBINHOOD_RPC_URL,
     usdgAddress: USDG_ADDRESS,
     wethAddress: WETH_ADDRESS,
     pricePoolCacheMs: 0,
     priceRouteIntermediateTokens: [WETH_ADDRESS],
   };
-  const database = new StateDatabase(":memory:");
-
-  try {
-    await database.initialize();
-    const service = new RefreshService(
-      config,
-      createChainClient(config),
-      database,
-      resolveDeployments(),
-    );
-    const result = await service.refresh();
-    return serializePortfolio(walletAddress, result.portfolio);
-  } finally {
-    database.close();
-  }
+  const database = await getDatabase();
+  const service = new RefreshService(
+    config,
+    createChainClient(config),
+    database,
+    resolveDeployments(),
+  );
+  const result = await service.refresh();
+  return serializePortfolio(walletAddress, result.portfolio);
 }
 
 export function serializePortfolio(

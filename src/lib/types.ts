@@ -1,6 +1,6 @@
 export type PositionVersion = "v3" | "v4";
 export type RangeStatus = "in_range" | "out_of_range";
-export type AccountingStatus = "syncing" | "synced" | "unavailable";
+export type AccountingStatus = "syncing" | "synced" | "partial" | "unavailable";
 
 export interface TokenInfo {
   address: string;

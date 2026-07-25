@@ -13,9 +13,9 @@ or seed phrase.
 - Reconstructs deposits, withdrawals, claimed fees, and profit/loss from
   historical on-chain events.
 - Keeps blockchain and Blockscout access on the server.
-- Uses an in-memory SQLite database as a request-scoped calculation workspace.
-  No wallet address or portfolio data is persisted.
-- Preserves available real-time data when historical accounting is incomplete.
+- Uses the same Turso schema and accounting checkpoints as the notifier.
+- Preserves available real-time data when historical accounting is incomplete
+  and resumes from the last completed block.
 
 ## Requirements
 
@@ -27,6 +27,7 @@ or seed phrase.
 
 ```bash
 npm install
+npm run db:migrate
 npm run dev
 ```
 
@@ -42,11 +43,14 @@ npm run build
 npm run start
 ```
 
-The application currently uses the Robinhood Chain public RPC endpoint. Full
-historical accounting can be slow or rate-limited because every request is
-calculated without persistent storage. When only part of the historical scan
-fails, current position data remains visible and unsafe accounting values are
-shown as `Unavailable`.
+Configure `ROBINHOOD_RPC_URL`, `TURSO_DATABASE_URL`, and `TURSO_AUTH_TOKEN` as
+server-only environment variables. Historical accounting is committed in
+atomic block groups and shared with the notifier. When only part of a scan
+fails, current position data remains visible, the checkpoint is retained, and
+unsafe accounting values are shown as partial or unavailable.
+
+The notifier carries the same migration history. Migration jobs for the shared
+database must not run concurrently.
 
 ## API
 
