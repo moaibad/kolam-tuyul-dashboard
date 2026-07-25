@@ -49,10 +49,15 @@ export function PositionCard({
         );
 
   return (
-    <Card className="min-w-0 max-w-full gap-0 overflow-hidden border-white/[0.06] bg-card/90 py-0 shadow-[0_20px_50px_rgba(0,0,0,.18)]">
+    <Card
+      className={cn(
+        "min-w-0 max-w-full gap-0 overflow-hidden bg-card/90 py-0 shadow-[0_20px_50px_rgba(0,0,0,.18)]",
+        inRange ? "border-emerald-300/10" : "border-amber-300/20",
+      )}
+    >
       <div
         className={cn(
-          "h-0.5 w-full",
+          "h-1 w-full",
           inRange ? "bg-emerald-400" : "bg-amber-400",
         )}
       />
@@ -62,7 +67,7 @@ export function PositionCard({
             <TokenPair position={position} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-lg font-semibold tracking-tight text-slate-50">
+                <h2 className="truncate text-xl font-semibold tracking-[-0.025em] text-slate-50">
                   {position.token0.symbol} / {position.token1.symbol}
                 </h2>
                 <Badge

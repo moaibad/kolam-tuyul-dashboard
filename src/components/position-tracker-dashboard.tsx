@@ -166,7 +166,7 @@ export function PositionTrackerDashboard({
   return (
     <AppShell>
       <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden">
-        <header className="border-b border-white/[0.055] bg-[#11101e]/70 backdrop-blur-xl">
+        <header className="border-b border-white/[0.055] bg-[#11101e]/90">
           <div className="mx-auto flex min-h-20 min-w-0 max-w-[1800px] items-center justify-between gap-4 px-5 sm:px-7 xl:px-10">
             <div>
               <div className="flex items-center gap-2">
@@ -202,13 +202,21 @@ export function PositionTrackerDashboard({
         </header>
 
         <div className="mx-auto min-w-0 max-w-[1800px] px-5 py-6 sm:px-7 sm:py-8 xl:px-10">
-          <section className="min-w-0 max-w-full border-b border-white/[0.06] pb-6 sm:pb-8">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-              <div className="min-w-0">
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">
+          <section className="relative min-w-0 max-w-full overflow-hidden border-b border-white/[0.06] pb-7 sm:pb-9">
+            <div
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 hidden w-px bg-violet-400/30 sm:block"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-0 hidden h-7 w-px bg-cyan-300 sm:block"
+            />
+            <div className="flex flex-col gap-6 sm:pl-7 xl:flex-row xl:items-end xl:justify-between">
+              <div className="min-w-0 max-w-2xl">
+                <h2 className="max-w-xl text-3xl font-semibold tracking-[-0.03em] text-balance text-slate-50 sm:text-5xl">
                   Track a wallet
                 </h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
                   See LP value, performance, and positions that need attention.
                   No wallet connection required.
                 </p>

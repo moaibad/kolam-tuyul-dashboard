@@ -37,17 +37,24 @@ export function PortfolioSummary({
   return (
     <section
       aria-labelledby="portfolio-health-title"
-      className="overflow-hidden rounded-2xl bg-[#1b182b]"
+      className="relative overflow-hidden rounded-2xl bg-[#1b182b] shadow-[0_24px_70px_rgba(0,0,0,.24)]"
     >
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-x-0 top-0 h-1",
+          outOfRange > 0 ? "bg-amber-300" : "bg-emerald-300",
+        )}
+      />
       <div className="grid lg:grid-cols-[1.15fr_1fr_1fr]">
-        <div className="p-5 sm:p-6">
+        <div className="p-5 pt-7 sm:p-7 sm:pt-8">
           <p
             id="portfolio-health-title"
             className="text-xs font-medium text-slate-400"
           >
             Portfolio value
           </p>
-          <p className="mt-2 truncate text-3xl font-semibold tracking-tight text-slate-50">
+          <p className="mt-2 truncate text-4xl font-semibold tracking-[-0.03em] text-slate-50 sm:text-5xl">
             {formatMaybeCurrency(portfolio.totals.currentLpValueUsdg)}
           </p>
           <p className="mt-2 text-xs text-slate-500">
@@ -55,7 +62,7 @@ export function PortfolioSummary({
             {portfolio.positions.length === 1 ? "position" : "positions"}
           </p>
         </div>
-        <div className="border-t border-white/[0.06] p-5 sm:p-6 lg:border-t-0 lg:border-l">
+        <div className="border-t border-white/[0.06] p-5 sm:p-7 lg:border-t-0 lg:border-l">
           <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
             <TrendingUp className="size-4" />
             Profit / loss
@@ -73,14 +80,14 @@ export function PortfolioSummary({
             fees
           </p>
         </div>
-        <div className="border-t border-white/[0.06] p-5 sm:p-6 lg:border-t-0 lg:border-l">
+        <div className="border-t border-white/[0.06] p-5 sm:p-7 lg:border-t-0 lg:border-l">
           <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
             <Activity className="size-4" />
             Range health
           </div>
           <p
             className={cn(
-              "mt-2 text-2xl font-semibold tracking-tight",
+              "mt-2 text-2xl font-semibold tracking-[-0.025em]",
               outOfRange > 0 ? "text-amber-300" : "text-emerald-300",
             )}
           >
