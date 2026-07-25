@@ -472,6 +472,30 @@ export class StateDatabase {
     event.error ?? null)
   }
 
+  async deleteObsoleteRealizedEvents(input: {
+    walletAddress: string
+    positionId: string
+    retainedEventKeys: string[]
+  }) {
+    if (input.retainedEventKeys.length === 0) {
+      await this.execute(
+        'DELETE FROM realized_position_events WHERE wallet_address = ? AND position_id = ?',
+        input.walletAddress.toLowerCase(),
+        input.positionId,
+      )
+      return
+    }
+    const placeholders = input.retainedEventKeys.map(() => '?').join(', ')
+    await this.execute(
+      `DELETE FROM realized_position_events
+       WHERE wallet_address = ? AND position_id = ?
+         AND event_key NOT IN (${placeholders})`,
+      input.walletAddress.toLowerCase(),
+      input.positionId,
+      ...input.retainedEventKeys,
+    )
+  }
+
   async listRealizedEvents(walletAddress: string, month: string): Promise<StoredRealizedEvent[]> {
     const rows = (await this.db.execute({
       sql: `

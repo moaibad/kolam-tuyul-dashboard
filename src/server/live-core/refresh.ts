@@ -73,6 +73,7 @@ export class RefreshService {
         positionId: data.id,
         version: data.position.version,
         pair: `${data.token0.symbol} / ${data.token1.symbol}`,
+        currentLiquidity: data.liquidity,
       })
       if (data.liquidity === 0n) continue
       const snapshot = await buildPositionSnapshot({ client: this.client, db: this.db, data, oracle, walletAddress: this.config.walletAddress, blockNumber, nowMs })

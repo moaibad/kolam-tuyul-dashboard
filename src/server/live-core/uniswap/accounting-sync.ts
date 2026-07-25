@@ -260,6 +260,12 @@ async function ensureMintInfo(client: PublicClient, db: StateDatabase, data: Pos
 
 async function valuePair(oracle: PortfolioPriceOracle, data: PositionData, amount0: bigint, amount1: bigint, blockNumber: bigint) {
   const [value0, value1] = await Promise.all([oracle.valueUsdg(data.token0, amount0, blockNumber), oracle.valueUsdg(data.token1, amount1, blockNumber)])
+  if (amount0 > 0n && value0 == null) {
+    throw new Error(`No historical USDG price route for ${data.token0.symbol} at block ${blockNumber.toString()}`)
+  }
+  if (amount1 > 0n && value1 == null) {
+    throw new Error(`No historical USDG price route for ${data.token1.symbol} at block ${blockNumber.toString()}`)
+  }
   return (value0 ?? 0) + (value1 ?? 0)
 }
 

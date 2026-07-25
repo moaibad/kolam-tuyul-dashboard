@@ -72,6 +72,60 @@ describe("realized LP lifecycle", () => {
     ]);
   });
 
+  it("waits for principal collection after liquidity reaches zero", () => {
+    const events = deriveRealizedEvents({
+      liquidity: [liquidity(1n, 100n), liquidity(2n, -100n)],
+      cashflows: [
+        cashflow(1n, "deposit", 1_000),
+        cashflow(3n, "withdrawal", 1_080),
+      ],
+    });
+
+    expect(events).toMatchObject([
+      {
+        lifecycle: 1,
+        kind: "closure",
+        blockNumber: 3n,
+        withdrawnUsdg: 1_080,
+        pnlUsdg: 80,
+      },
+    ]);
+  });
+
+  it("does not realize a zero-liquidity position before withdrawal", () => {
+    expect(
+      deriveRealizedEvents({
+        liquidity: [liquidity(1n, 100n), liquidity(2n, -100n)],
+        cashflows: [cashflow(1n, "deposit", 25)],
+      }),
+    ).toEqual([]);
+  });
+
+  it("does not treat an unvalued withdrawal as zero-dollar proceeds", () => {
+    expect(
+      deriveRealizedEvents({
+        liquidity: [liquidity(1n, 100n), liquidity(2n, -100n)],
+        cashflows: [
+          cashflow(1n, "deposit", 25),
+          cashflow(2n, "withdrawal", 0),
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it("suppresses the latest closure when the tracker still reports liquidity", () => {
+    expect(
+      deriveRealizedEvents({
+        liquidity: [liquidity(1n, 100n), liquidity(2n, -100n)],
+        cashflows: [
+          cashflow(1n, "deposit", 25),
+          cashflow(2n, "withdrawal", 30),
+        ],
+        currentLiquidity: 100n,
+      }),
+    ).toEqual([]);
+  });
+
   it("creates a new lifecycle after liquidity is reopened", () => {
     const events = deriveRealizedEvents({
       liquidity: [
@@ -119,4 +173,3 @@ describe("realized LP lifecycle", () => {
     );
   });
 });
-

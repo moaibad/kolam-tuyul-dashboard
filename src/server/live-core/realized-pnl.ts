@@ -31,6 +31,7 @@ export interface DerivedRealizedEvent {
 export function deriveRealizedEvents(input: {
   liquidity: RealizedLiquidityEvent[];
   cashflows: RealizedCashflowEvent[];
+  currentLiquidity?: bigint;
 }): DerivedRealizedEvent[] {
   const blocks = new Map<
     string,
@@ -65,6 +66,15 @@ export function deriveRealizedEvents(input: {
   let liquidity = 0n;
   let lifecycle = 0;
   let totals = emptyTotals();
+  let lifecycleOpen = false;
+  let pendingClosure:
+    | {
+        blockNumber: bigint;
+        logIndex: number;
+        timestampMs: number;
+        txHash: string;
+      }
+    | undefined;
   const result: DerivedRealizedEvent[] = [];
   const orderedBlocks = [...blocks.values()].sort((a, b) =>
     a.blockNumber < b.blockNumber ? -1 : a.blockNumber > b.blockNumber ? 1 : 0,
@@ -86,13 +96,15 @@ export function deriveRealizedEvents(input: {
     const opens = !wasActive && nextLiquidity > 0n;
     const closes = (wasActive || opens) && nextLiquidity === 0n && blockDelta < 0n;
 
-    if (opens) {
+    if (opens && !lifecycleOpen) {
       lifecycle += 1;
       totals = emptyTotals();
+      lifecycleOpen = true;
     }
 
+    let withdrawalMarker: RealizedCashflowEvent | undefined;
     for (const cashflow of orderedCashflows) {
-      if (!wasActive && !opens && cashflow.type === "fee") {
+      if (!lifecycleOpen && cashflow.type === "fee") {
         result.push({
           key: `late_fee:${cashflow.txHash}:${cashflow.logIndex}`,
           lifecycle,
@@ -107,15 +119,19 @@ export function deriveRealizedEvents(input: {
         });
         continue;
       }
-      if (!wasActive && !opens) continue;
+      if (!lifecycleOpen) continue;
       if (cashflow.type === "deposit") totals.deposited += cashflow.valueUsdg;
-      if (cashflow.type === "withdrawal")
+      if (cashflow.type === "withdrawal") {
         totals.withdrawn += cashflow.valueUsdg;
+        if ((pendingClosure || closes) && cashflow.valueUsdg > 0) {
+          withdrawalMarker = cashflow;
+        }
+      }
       if (cashflow.type === "fee") totals.fees += cashflow.valueUsdg;
     }
 
     if (closes) {
-      const marker =
+      pendingClosure =
         orderedLiquidity.at(-1) ??
         ({
           blockNumber: block.blockNumber,
@@ -123,6 +139,10 @@ export function deriveRealizedEvents(input: {
           timestampMs: orderedCashflows.at(-1)?.timestampMs ?? 0,
           txHash: orderedCashflows.at(-1)?.txHash ?? "",
         } as RealizedLiquidityEvent);
+    }
+
+    if (pendingClosure && withdrawalMarker) {
+      const marker = withdrawalMarker;
       result.push({
         key: `closure:${lifecycle}:${marker.txHash}:${marker.logIndex}`,
         lifecycle,
@@ -136,9 +156,18 @@ export function deriveRealizedEvents(input: {
         pnlUsdg: totals.withdrawn + totals.fees - totals.deposited,
       });
       totals = emptyTotals();
+      lifecycleOpen = false;
+      pendingClosure = undefined;
     }
 
     liquidity = nextLiquidity > 0n ? nextLiquidity : 0n;
+  }
+
+  if (input.currentLiquidity != null && input.currentLiquidity > 0n && liquidity === 0n) {
+    const latestClosureIndex = result.findLastIndex(
+      (event) => event.kind === "closure",
+    );
+    if (latestClosureIndex >= 0) result.splice(latestClosureIndex, 1);
   }
 
   return result;
@@ -162,12 +191,17 @@ export async function persistRealizedPositionEvents(input: {
   positionId: string;
   version: "v3" | "v4";
   pair: string;
+  currentLiquidity?: bigint;
 }) {
   const [liquidity, cashflows] = await Promise.all([
     input.db.listLiquidityEvents(input.positionId),
     input.db.listRealizedCashflows(input.positionId),
   ]);
-  const events = deriveRealizedEvents({ liquidity, cashflows });
+  const events = deriveRealizedEvents({
+    liquidity,
+    cashflows,
+    currentLiquidity: input.currentLiquidity,
+  });
   for (const event of events) {
     await input.db.upsertRealizedEvent({
       eventKey: `${input.walletAddress.toLowerCase()}:${input.positionId}:${event.key}`,
@@ -187,6 +221,14 @@ export async function persistRealizedPositionEvents(input: {
       status: "complete",
     });
   }
+  await input.db.deleteObsoleteRealizedEvents({
+    walletAddress: input.walletAddress,
+    positionId: input.positionId,
+    retainedEventKeys: events.map(
+      (event) =>
+        `${input.walletAddress.toLowerCase()}:${input.positionId}:${event.key}`,
+    ),
+  });
   return events.length;
 }
 

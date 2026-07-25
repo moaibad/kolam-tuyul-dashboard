@@ -100,6 +100,53 @@ describe('shared Turso state database', () => {
     expect(await database.listRealizedEvents('0xwallet', '2026-07')).toHaveLength(1)
   })
 
+  it('removes obsolete realized events while retaining valid lifecycle history', async () => {
+    const database = new StateDatabase(':memory:')
+    databases.push(database)
+    await database.initialize()
+    const base = {
+      walletAddress: '0xwallet',
+      positionId: 'v4:manager:1',
+      version: 'v4' as const,
+      pair: 'ETH / USDC',
+      depositedUsdg: 100,
+      withdrawnUsdg: 110,
+      claimedFeesUsdg: 0,
+      pnlUsdg: 10,
+      status: 'complete' as const,
+    }
+    await database.upsertRealizedEvent({
+      ...base,
+      eventKey: 'valid',
+      lifecycle: 1,
+      kind: 'closure',
+      dateKey: '2026-07-01',
+      blockNumber: 10n,
+      txHash: '0xvalid',
+    })
+    await database.upsertRealizedEvent({
+      ...base,
+      eventKey: 'false-loss',
+      lifecycle: 2,
+      kind: 'closure',
+      dateKey: '2026-07-02',
+      blockNumber: 20n,
+      txHash: '0xinvalid',
+    })
+
+    await database.deleteObsoleteRealizedEvents({
+      walletAddress: '0xwallet',
+      positionId: 'v4:manager:1',
+      retainedEventKeys: ['valid'],
+    })
+
+    expect(
+      (await database.listRealizedEvents('0xwallet', '2026-07')).map(
+        (event) => event.eventKey,
+      ),
+    ).toEqual(['valid'])
+  })
+
   it('stores calendar backfill progress per wallet', async () => {
     const database = new StateDatabase(':memory:')
     databases.push(database)
