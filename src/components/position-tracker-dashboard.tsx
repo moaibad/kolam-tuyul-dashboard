@@ -24,7 +24,7 @@ import { httpPositionDataSource } from "@/lib/http-position-data-source";
 import type { PortfolioSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const AUTO_REFETCH_INTERVAL_MS = 60_000;
+const AUTO_REFETCH_INTERVAL_MS = 90_000;
 const DEMO_WALLET_ADDRESS = "0x0000000000000000000000000000000000000001";
 
 export function PositionTrackerDashboard({

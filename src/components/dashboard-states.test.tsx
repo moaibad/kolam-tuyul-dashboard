@@ -97,7 +97,7 @@ describe("dashboard states", () => {
         configurable: true,
         value: "hidden",
       });
-      await act(() => vi.advanceTimersByTimeAsync(59_550));
+      await act(() => vi.advanceTimersByTimeAsync(89_550));
 
       expect(getPortfolio).toHaveBeenCalledTimes(1);
       expect(screen.getByText("Uniswap v4")).toBeInTheDocument();

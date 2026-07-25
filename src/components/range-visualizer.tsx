@@ -32,7 +32,7 @@ export function RangeVisualizer({
     value: number,
   ) {
     try {
-      await navigator.clipboard.writeText(String(value));
+      await navigator.clipboard.writeText(value.toFixed(8));
       setCopiedBoundary(boundary);
       window.setTimeout(() => {
         setCopiedBoundary((current) =>
@@ -119,7 +119,7 @@ export function RangeVisualizer({
             {copiedBoundary === "lower" ? (
               <Check className="size-3.5 shrink-0 text-emerald-300" />
             ) : (
-              <Copy className="size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+              <Copy className="size-3.5 shrink-0" />
             )}
           </span>
         </button>
@@ -134,7 +134,7 @@ export function RangeVisualizer({
             {copiedBoundary === "upper" ? (
               <Check className="size-3.5 shrink-0 text-emerald-300" />
             ) : (
-              <Copy className="size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+              <Copy className="size-3.5 shrink-0" />
             )}
             <span className="truncate">{formatPrice(position.upperPrice)}</span>
           </span>
