@@ -37,6 +37,7 @@ Thumbs.db
 .vscode/
 /.agents/
 /skills-lock.json
+/.impeccable/
 
 # debug
 npm-debug.log*

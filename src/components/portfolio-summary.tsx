@@ -1,7 +1,7 @@
 import {
   Activity,
+  ChevronDown,
   CircleDollarSign,
-  Coins,
   Layers3,
   TrendingUp,
 } from "lucide-react";
@@ -30,136 +30,126 @@ export function PortfolioSummary({
       : portfolio.totals.claimedFeesUsdg +
         portfolio.totals.unclaimedFeesUsdg;
 
-  const metrics = [
-    {
-      label: "Open positions",
-      value: String(portfolio.positions.length),
-      detail: `${inRange} in range · ${outOfRange} out`,
-      icon: Layers3,
-      accent: "violet",
-    },
-    {
-      label: "Deposited",
-      value: formatMaybeCurrency(portfolio.totals.depositedUsdg),
-      detail: "HODL benchmark",
-      icon: CircleDollarSign,
-      accent: "cyan",
-    },
-    {
-      label: "Current LP value",
-      value: formatMaybeCurrency(portfolio.totals.currentLpValueUsdg),
-      detail: `Across ${portfolio.positions.length} positions`,
-      icon: Activity,
-      accent: "blue",
-    },
-    {
-      label: "Total fees",
-      value: formatMaybeCurrency(totalFees),
-      detail: `${formatMaybeCurrency(portfolio.totals.unclaimedFeesUsdg)} unclaimed`,
-      icon: Coins,
-      accent: "pink",
-    },
-    {
-      label: "Total result",
-      value: formatMaybeCurrency(portfolio.totals.totalResultUsdg),
-      detail: "LP value + all fees",
-      icon: CircleDollarSign,
-      accent: "violet",
-    },
-    {
-      label: "Profit / loss",
-      value: formatMaybeSignedCurrency(portfolio.totals.profitLossUsdg),
-      detail: `${formatMaybePercent(portfolio.totals.profitLossPercent)} · includes IL + fees`,
-      icon: TrendingUp,
-      accent:
-        portfolio.totals.profitLossUsdg == null ||
-        portfolio.totals.profitLossUsdg >= 0
-          ? "green"
-          : "red",
-      emphasize: true,
-    },
-  ] as const;
+  const isProfitable =
+    portfolio.totals.profitLossUsdg == null ||
+    portfolio.totals.profitLossUsdg >= 0;
 
   return (
-    <section aria-label="Portfolio overview">
-      <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-6">
-        {metrics.map((metric) => (
-          <article
-            key={metric.label}
-            className="group flex min-h-40 min-w-0 flex-col rounded-2xl border border-white/[0.065] bg-[#1b182b] p-4 shadow-[0_12px_36px_rgba(0,0,0,.16)] transition-colors hover:border-white/12 sm:p-5"
+    <section
+      aria-labelledby="portfolio-health-title"
+      className="overflow-hidden rounded-2xl bg-[#1b182b]"
+    >
+      <div className="grid lg:grid-cols-[1.15fr_1fr_1fr]">
+        <div className="p-5 sm:p-6">
+          <p
+            id="portfolio-health-title"
+            className="text-xs font-medium text-slate-400"
           >
-            <div className="flex items-center justify-between gap-3">
-              <div
-                className={cn(
-                  "flex min-w-0 items-center gap-2",
-                  accentText[metric.accent],
-                )}
-              >
-                <metric.icon className="size-3.5 shrink-0" />
-                <p className="truncate text-[10px] font-semibold tracking-[0.1em] text-slate-400 uppercase">
-                  {metric.label}
-                </p>
-              </div>
-              <span
-                className={cn(
-                  "size-1.5 shrink-0 rounded-full",
-                  accentDot[metric.accent],
-                )}
-              />
-            </div>
-
-            <p
-              className={cn(
-                "mt-4 truncate text-xl font-semibold tracking-tight text-slate-50 2xl:text-2xl",
-                "emphasize" in metric &&
-                  metric.emphasize &&
-                  accentText[metric.accent],
-              )}
-            >
-              {metric.value}
-            </p>
-
-            <p
-              className={cn(
-                "mt-auto w-fit max-w-full truncate rounded-md border px-2 py-1 text-[10px]",
-                accentBadge[metric.accent],
-              )}
-            >
-              {metric.detail}
-            </p>
-          </article>
-        ))}
+            Portfolio value
+          </p>
+          <p className="mt-2 truncate text-3xl font-semibold tracking-tight text-slate-50">
+            {formatMaybeCurrency(portfolio.totals.currentLpValueUsdg)}
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            Across {portfolio.positions.length} open{" "}
+            {portfolio.positions.length === 1 ? "position" : "positions"}
+          </p>
+        </div>
+        <div className="border-t border-white/[0.06] p-5 sm:p-6 lg:border-t-0 lg:border-l">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+            <TrendingUp className="size-4" />
+            Profit / loss
+          </div>
+          <p
+            className={cn(
+              "mt-2 truncate text-2xl font-semibold tracking-tight",
+              isProfitable ? "text-emerald-300" : "text-rose-300",
+            )}
+          >
+            {formatMaybeSignedCurrency(portfolio.totals.profitLossUsdg)}
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            {formatMaybePercent(portfolio.totals.profitLossPercent)} including
+            fees
+          </p>
+        </div>
+        <div className="border-t border-white/[0.06] p-5 sm:p-6 lg:border-t-0 lg:border-l">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+            <Activity className="size-4" />
+            Range health
+          </div>
+          <p
+            className={cn(
+              "mt-2 text-2xl font-semibold tracking-tight",
+              outOfRange > 0 ? "text-amber-300" : "text-emerald-300",
+            )}
+          >
+            {outOfRange > 0
+              ? `${outOfRange} need${outOfRange === 1 ? "s" : ""} attention`
+              : "All in range"}
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            {inRange} in range · {outOfRange} out of range
+          </p>
+        </div>
       </div>
+      <details className="group border-t border-white/[0.06]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-xs font-medium text-slate-400 transition-colors hover:bg-white/[0.025] hover:text-slate-200 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-violet-400 sm:px-6">
+          Accounting details
+          <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="grid gap-x-8 gap-y-5 border-t border-white/[0.05] px-5 py-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
+          <DetailMetric
+            icon={CircleDollarSign}
+            label="Deposited benchmark"
+            value={formatMaybeCurrency(portfolio.totals.depositedUsdg)}
+          />
+          <DetailMetric
+            icon={CircleDollarSign}
+            label="Current LP value"
+            value={formatMaybeCurrency(portfolio.totals.currentLpValueUsdg)}
+          />
+          <DetailMetric
+            icon={Layers3}
+            label="Total fees"
+            value={formatMaybeCurrency(totalFees)}
+            note={`${formatMaybeCurrency(portfolio.totals.unclaimedFeesUsdg)} unclaimed`}
+          />
+          <DetailMetric
+            icon={Activity}
+            label="LP value + fees"
+            value={formatMaybeCurrency(portfolio.totals.totalResultUsdg)}
+          />
+        </div>
+      </details>
     </section>
   );
 }
 
-const accentText = {
-  violet: "text-violet-300",
-  cyan: "text-cyan-300",
-  blue: "text-blue-300",
-  pink: "text-pink-300",
-  green: "text-emerald-300",
-  red: "text-rose-300",
-};
-
-const accentDot = {
-  violet: "bg-violet-400",
-  cyan: "bg-cyan-400",
-  blue: "bg-blue-400",
-  pink: "bg-pink-400",
-  green: "bg-emerald-400",
-  red: "bg-rose-400",
-};
-
-const accentBadge = {
-  violet: "border-violet-400/15 bg-violet-400/[0.07] text-violet-200/75",
-  cyan: "border-cyan-400/15 bg-cyan-400/[0.07] text-cyan-200/75",
-  blue: "border-blue-400/15 bg-blue-400/[0.07] text-blue-200/75",
-  pink: "border-pink-400/15 bg-pink-400/[0.07] text-pink-200/75",
-  green: "border-emerald-400/15 bg-emerald-400/[0.07] text-emerald-200/75",
-  red: "border-rose-400/15 bg-rose-400/[0.07] text-rose-200/75",
-};
+function DetailMetric({
+  icon: Icon,
+  label,
+  value,
+  note,
+}: {
+  icon: typeof Activity;
+  label: string;
+  value: string;
+  note?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-2 text-xs text-slate-500">
+        <Icon className="size-3.5" />
+        {label}
+      </div>
+      <p className="mt-1.5 truncate text-sm font-medium text-slate-200">
+        {value}
+      </p>
+      {note && <p className="mt-1 text-xs text-slate-600">{note}</p>}
+    </div>
+  );
+}
 
 function formatMaybeCurrency(value: number | null) {
   return value == null ? "Unavailable" : formatCurrency(value);

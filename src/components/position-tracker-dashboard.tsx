@@ -5,10 +5,8 @@ import {
   AlertTriangle,
   Database,
   RefreshCw,
-  ShieldCheck,
-  Sparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { DashboardLoading } from "@/components/dashboard-loading";
@@ -137,17 +135,6 @@ export function PositionTrackerDashboard({
     return () => window.clearInterval(interval);
   }, [displayedPortfolio]);
 
-  const formattedUpdate = useMemo(() => {
-    if (!displayedPortfolio) return "";
-    return new Intl.DateTimeFormat("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-      timeZone: "UTC",
-    }).format(new Date(displayedPortfolio.updatedAtMs));
-  }, [displayedPortfolio]);
-
   function search(walletAddress: string) {
     if (walletAddress.toLowerCase() === address.toLowerCase()) {
       void loadPortfolio(walletAddress);
@@ -180,11 +167,7 @@ export function PositionTrackerDashboard({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="hidden items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.025] px-3 py-2 text-[11px] text-slate-400 sm:flex">
-                <span className="relative flex size-2">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-30" />
-                  <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
-                </span>
+              <div className="hidden items-center px-2 py-2 text-[11px] text-slate-500 sm:flex">
                 Robinhood Chain
               </div>
               <Button
@@ -204,19 +187,15 @@ export function PositionTrackerDashboard({
         </header>
 
         <div className="mx-auto min-w-0 max-w-[1800px] px-5 py-6 sm:px-7 sm:py-8 xl:px-10">
-          <section className="relative min-w-0 max-w-full overflow-hidden rounded-3xl border border-white/[0.055] bg-[#19162b]/80 p-5 shadow-[0_20px_60px_rgba(0,0,0,.16)] sm:p-7">
-            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <section className="min-w-0 max-w-full border-b border-white/[0.06] pb-6 sm:pb-8">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.16em] text-violet-300 uppercase">
-                  <Sparkles className="size-3.5" />
-                  Read-only portfolio intelligence
-                </div>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">
-                  Track every LP position.
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">
+                  Track a wallet
                 </h2>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                  Explore position value, fees, range health, and performance
-                  without connecting a wallet.
+                  See LP value, performance, and positions that need attention.
+                  No wallet connection required.
                 </p>
               </div>
               <div className="min-w-0 w-full max-w-full xl:max-w-2xl">
@@ -226,19 +205,14 @@ export function PositionTrackerDashboard({
           </section>
 
           {displayedPortfolio && (
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.045] bg-white/[0.018] px-4 py-3">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
               <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500">
-                <ShieldCheck className="size-4 shrink-0 text-cyan-400" />
                 <span>Tracking</span>
                 <code className="truncate font-mono text-slate-300">
                   {formatCompactAddress(displayedPortfolio.address)}
                 </code>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] text-slate-600">
-                <span className="flex items-center gap-1.5">
-                  <Activity className="size-3" />
-                  Updated {formattedUpdate} UTC
-                </span>
                 <span className="flex items-center gap-1.5">
                   <Database className="size-3" />
                   Block{" "}
@@ -341,13 +315,21 @@ export function PositionTrackerDashboard({
                     </div>
                   ) : (
                     <div className="grid min-w-0 gap-4 xl:grid-cols-3">
-                      {displayedPortfolio.positions.map((position) => (
-                        <PositionCard
-                          key={position.id}
-                          position={position}
-                          nowMs={displayedPortfolio.updatedAtMs}
-                        />
-                      ))}
+                      {[...displayedPortfolio.positions]
+                        .sort((a, b) =>
+                          a.status === b.status
+                            ? 0
+                            : a.status === "out_of_range"
+                              ? -1
+                              : 1,
+                        )
+                        .map((position) => (
+                          <PositionCard
+                            key={position.id}
+                            position={position}
+                            nowMs={displayedPortfolio.updatedAtMs}
+                          />
+                        ))}
                     </div>
                   )}
                 </section>
