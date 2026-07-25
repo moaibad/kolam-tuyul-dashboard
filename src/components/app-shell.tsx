@@ -10,7 +10,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/"
             aria-label="KolamTuyul home"
-            className="flex shrink-0 items-center gap-2.5 text-slate-100 transition-colors hover:text-white"
+            className="flex shrink-0 items-center gap-2.5 text-[#eeeaf6] transition-colors hover:text-white"
           >
             <span className="size-9 overflow-hidden rounded-xl shadow-[0_6px_18px_rgba(0,0,0,.22)]">
               <picture>
@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 />
               </picture>
             </span>
-            <span className="hidden text-sm font-semibold tracking-[-0.015em] sm:inline">
+            <span className="font-brand hidden text-[15px] font-semibold tracking-[-0.025em] sm:inline">
               KolamTuyul
             </span>
           </Link>
