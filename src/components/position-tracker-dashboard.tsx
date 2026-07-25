@@ -41,6 +41,7 @@ export function PositionTrackerDashboard({
     message: string;
   } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const activeAddressRef = useRef(address);
   const latestRequestRef = useRef(0);
@@ -103,6 +104,17 @@ export function PositionTrackerDashboard({
   }, []);
 
   useEffect(() => {
+    const updateConnection = () => setIsOffline(!window.navigator.onLine);
+    updateConnection();
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    return () => {
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+    };
+  }, []);
+
+  useEffect(() => {
     activeAddressRef.current = address;
     if (!address) {
       latestRequestRef.current += 1;
@@ -115,7 +127,9 @@ export function PositionTrackerDashboard({
     if (!address) return;
 
     const interval = window.setInterval(() => {
-      void loadPortfolio(address);
+      if (window.navigator.onLine && document.visibilityState === "visible") {
+        void loadPortfolio(address);
+      }
     }, AUTO_REFETCH_INTERVAL_MS);
 
     return () => {
@@ -136,6 +150,7 @@ export function PositionTrackerDashboard({
   }, [displayedPortfolio]);
 
   function search(walletAddress: string) {
+    if (isRefreshing) return;
     if (walletAddress.toLowerCase() === address.toLowerCase()) {
       void loadPortfolio(walletAddress);
       return;
@@ -199,7 +214,7 @@ export function PositionTrackerDashboard({
                 </p>
               </div>
               <div className="min-w-0 w-full max-w-full xl:max-w-2xl">
-                <WalletSearch onSearch={search} />
+                <WalletSearch onSearch={search} isLoading={isLoading} />
               </div>
             </div>
           </section>
@@ -223,6 +238,22 @@ export function PositionTrackerDashboard({
           )}
 
           <div className="mt-5">
+            {isOffline && (
+              <div
+                role="status"
+                className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/15 bg-amber-400/[0.055] p-4 text-sm text-amber-200"
+              >
+                <span>
+                  You’re offline. Live updates will resume when your connection
+                  returns.
+                </span>
+                {displayedPortfolio && (
+                  <span className="text-xs text-amber-100/60">
+                    Showing the last successful snapshot
+                  </span>
+                )}
+              </div>
+            )}
             {!address && <EmptyState />}
             {isLoading && <DashboardLoading />}
             {loadError && address && !displayedPortfolio && (
@@ -230,7 +261,26 @@ export function PositionTrackerDashboard({
                 role="alert"
                 className="rounded-2xl border border-rose-400/15 bg-rose-400/[0.055] p-5 text-sm text-rose-300"
               >
-                {loadError}
+                <p className="font-medium text-rose-200">
+                  Portfolio couldn’t be loaded
+                </p>
+                <p className="mt-1 leading-6 text-rose-200/75">{loadError}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isRefreshing || isOffline}
+                  onClick={refresh}
+                  className="mt-4 border-rose-300/20 bg-rose-300/[0.06] text-rose-100 hover:bg-rose-300/10"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "size-3.5",
+                      isRefreshing && "animate-spin",
+                    )}
+                  />
+                  {isRefreshing ? "Trying again…" : "Try again"}
+                </Button>
               </div>
             )}
             {displayedPortfolio && (

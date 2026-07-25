@@ -67,7 +67,7 @@ describe("dashboard states", () => {
     ).toBeInTheDocument();
   });
 
-  it("polls every 60 seconds while the tab is hidden", async () => {
+  it("pauses polling while the tab is hidden", async () => {
     vi.useFakeTimers();
     const getPortfolio = vi.spyOn(httpPositionDataSource, "getPortfolio");
     const visibilityDescriptor = Object.getOwnPropertyDescriptor(
@@ -99,15 +99,14 @@ describe("dashboard states", () => {
       });
       await act(() => vi.advanceTimersByTimeAsync(59_550));
 
-      expect(getPortfolio).toHaveBeenCalledTimes(2);
-      expect(screen.getByText("Syncing all positions...")).toBeInTheDocument();
+      expect(getPortfolio).toHaveBeenCalledTimes(1);
       expect(screen.getByText("Uniswap v4")).toBeInTheDocument();
 
       document.dispatchEvent(new Event("visibilitychange"));
-      expect(getPortfolio).toHaveBeenCalledTimes(2);
+      expect(getPortfolio).toHaveBeenCalledTimes(1);
 
       await act(() => vi.advanceTimersByTimeAsync(450));
-      expect(screen.getByText(/Last synced \d+s ago/)).toBeInTheDocument();
+      expect(screen.getByText(/Last synced/)).toBeInTheDocument();
     } finally {
       getPortfolio.mockRestore();
       if (visibilityDescriptor) {

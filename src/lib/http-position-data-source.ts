@@ -12,15 +12,32 @@ export class PortfolioDataSourceError extends Error {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 20_000;
+
 export class HttpPositionDataSource implements PositionDataSource {
   async getPortfolio(address: string): Promise<PortfolioSnapshot> {
-    const response = await fetch(
-      `/api/portfolio?address=${encodeURIComponent(address)}`,
-      {
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      },
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        `/api/portfolio?address=${encodeURIComponent(address)}`,
+        {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        },
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new PortfolioDataSourceError(
+          "The portfolio request timed out. Check your connection and try again.",
+          408,
+        );
+      }
+      throw new PortfolioDataSourceError(
+        "The portfolio service is unreachable. Check your connection and try again.",
+        0,
+      );
+    }
     const body = (await response.json().catch(() => null)) as
       | PortfolioSnapshot
       | { error?: string }
@@ -30,13 +47,31 @@ export class HttpPositionDataSource implements PositionDataSource {
       throw new PortfolioDataSourceError(
         body && "error" in body && body.error
           ? body.error
-          : "Live portfolio data could not be loaded.",
+          : getFallbackErrorMessage(response.status),
         response.status,
+      );
+    }
+
+    if (!body || !("address" in body)) {
+      throw new PortfolioDataSourceError(
+        "The portfolio service returned an invalid response. Please try again.",
+        502,
       );
     }
 
     return body as PortfolioSnapshot;
   }
+}
+
+function getFallbackErrorMessage(status: number) {
+  if (status === 401) return "Your session expired. Reload the page and try again.";
+  if (status === 403) return "You do not have permission to view this portfolio.";
+  if (status === 404) return "No portfolio data was found for this wallet.";
+  if (status === 429) return "Too many requests. Wait a moment, then try again.";
+  if (status >= 500) {
+    return "The portfolio service is temporarily unavailable. Please try again.";
+  }
+  return "Live portfolio data could not be loaded. Check the address and try again.";
 }
 
 export const httpPositionDataSource = new HttpPositionDataSource();
