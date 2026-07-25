@@ -8,7 +8,7 @@ describe("WalletSearch", () => {
   it("rejects an invalid address without searching", async () => {
     const search = vi.fn();
     const user = userEvent.setup();
-    render(<WalletSearch initialValue="" onSearch={search} />);
+    render(<WalletSearch onSearch={search} />);
 
     await user.type(screen.getByLabelText("Wallet address"), "0x1234");
     await user.click(screen.getByRole("button", { name: "Track positions" }));
@@ -23,7 +23,7 @@ describe("WalletSearch", () => {
     const search = vi.fn();
     const user = userEvent.setup();
     const address = "0x0000000000000000000000000000000000000001";
-    render(<WalletSearch initialValue="" onSearch={search} />);
+    render(<WalletSearch onSearch={search} />);
 
     await user.type(screen.getByLabelText("Wallet address"), ` ${address} `);
     await user.click(screen.getByRole("button", { name: "Track positions" }));

@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -22,7 +21,6 @@ import { WalletSearch } from "@/components/wallet-search";
 import {
   formatCompactAddress,
   formatSyncAge,
-  isValidWalletAddress,
 } from "@/lib/format";
 import { httpPositionDataSource } from "@/lib/http-position-data-source";
 import type { PortfolioSnapshot } from "@/lib/types";
@@ -31,11 +29,7 @@ import { cn } from "@/lib/utils";
 const AUTO_REFETCH_INTERVAL_MS = 60_000;
 
 export function PositionTrackerDashboard() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const queryAddress = searchParams.get("address")?.trim() ?? "";
-  const address = isValidWalletAddress(queryAddress) ? queryAddress : "";
+  const [address, setAddress] = useState("");
   const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
   const [loadFailure, setLoadFailure] = useState<{
     address: string;
@@ -115,20 +109,12 @@ export function PositionTrackerDashboard() {
   useEffect(() => {
     if (!address) return;
 
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") {
-        void loadPortfolio(address);
-      }
-    };
-    const interval = window.setInterval(
-      refreshWhenVisible,
-      AUTO_REFETCH_INTERVAL_MS,
-    );
-    document.addEventListener("visibilitychange", refreshWhenVisible);
+    const interval = window.setInterval(() => {
+      void loadPortfolio(address);
+    }, AUTO_REFETCH_INTERVAL_MS);
 
     return () => {
       window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [address, loadPortfolio]);
 
@@ -156,9 +142,11 @@ export function PositionTrackerDashboard() {
   }, [displayedPortfolio]);
 
   function search(walletAddress: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("address", walletAddress);
-    router.push(`${pathname}?${params.toString()}`);
+    if (walletAddress.toLowerCase() === address.toLowerCase()) {
+      void loadPortfolio(walletAddress);
+      return;
+    }
+    setAddress(walletAddress);
   }
 
   async function refresh() {
@@ -226,7 +214,7 @@ export function PositionTrackerDashboard() {
                 </p>
               </div>
               <div className="min-w-0 w-full max-w-full xl:max-w-2xl">
-                <WalletSearch initialValue={queryAddress} onSearch={search} />
+                <WalletSearch onSearch={search} />
               </div>
             </div>
           </section>

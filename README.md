@@ -32,8 +32,8 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000), then enter a public EVM
-wallet address. The selected address is stored only in the browser URL as the
-`?address=` query parameter.
+wallet address. The selected address is kept only in the dashboard's local
+component state and is cleared when the page reloads.
 
 ## Production
 

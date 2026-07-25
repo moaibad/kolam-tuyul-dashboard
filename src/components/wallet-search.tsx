@@ -8,13 +8,11 @@ import { Input } from "@/components/ui/input";
 import { isValidWalletAddress } from "@/lib/format";
 
 export function WalletSearch({
-  initialValue,
   onSearch,
 }: {
-  initialValue: string;
   onSearch: (address: string) => void;
 }) {
-  const [value, setValue] = useState(initialValue);
+  const [value, setValue] = useState("");
   const [error, setError] = useState("");
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
