@@ -13,7 +13,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="KolamTuyul home"
             className="flex shrink-0 items-center gap-2.5 text-slate-100"
           >
-            <span className="grid size-9 place-items-center rounded-xl bg-linear-to-br from-violet-500 to-cyan-400 text-white shadow-[0_6px_20px_rgba(124,58,237,.25)]">
+            <span className="grid size-9 place-items-center rounded-xl bg-violet-600 text-white shadow-[0_6px_18px_rgba(0,0,0,.22)]">
               <Waves className="size-[18px]" />
             </span>
             <span className="hidden font-semibold tracking-tight sm:inline">

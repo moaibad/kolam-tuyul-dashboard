@@ -84,9 +84,7 @@
     min-width: 320px;
     overflow-x: hidden;
     font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-    background-image:
-      radial-gradient(circle at 80% -10%, rgb(124 58 237 / 0.08), transparent 30rem),
-      linear-gradient(180deg, #100e1b, #0d0c17);
+    background-image: none;
   }
 
   button,

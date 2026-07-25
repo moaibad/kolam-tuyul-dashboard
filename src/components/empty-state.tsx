@@ -3,9 +3,8 @@ import { Search, ShieldCheck, WalletCards } from "lucide-react";
 export function EmptyState() {
   return (
     <section className="relative grid min-h-[440px] place-items-center overflow-hidden rounded-3xl border border-white/[0.055] bg-card/55 px-6 py-16 text-center">
-      <div className="pointer-events-none absolute top-1/2 left-1/2 size-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/[0.055] blur-3xl" />
       <div className="relative max-w-md">
-        <div className="mx-auto grid size-16 place-items-center rounded-3xl border border-violet-400/15 bg-violet-400/[0.07] text-violet-300 shadow-[0_0_50px_rgba(124,58,237,.12)]">
+        <div className="mx-auto grid size-16 place-items-center rounded-3xl border border-violet-400/15 bg-violet-400/[0.07] text-violet-300 shadow-[0_12px_30px_rgba(0,0,0,.2)]">
           <WalletCards className="size-7" />
         </div>
         <h2 className="mt-6 text-2xl font-semibold tracking-tight text-slate-50">

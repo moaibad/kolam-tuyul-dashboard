@@ -205,7 +205,6 @@ export function PositionTrackerDashboard({
 
         <div className="mx-auto min-w-0 max-w-[1800px] px-5 py-6 sm:px-7 sm:py-8 xl:px-10">
           <section className="relative min-w-0 max-w-full overflow-hidden rounded-3xl border border-white/[0.055] bg-[#19162b]/80 p-5 shadow-[0_20px_60px_rgba(0,0,0,.16)] sm:p-7">
-            <div className="pointer-events-none absolute -top-24 right-[10%] size-64 rounded-full bg-violet-500/[0.07] blur-3xl" />
             <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.16em] text-violet-300 uppercase">

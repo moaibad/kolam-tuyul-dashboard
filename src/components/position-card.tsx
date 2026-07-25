@@ -53,9 +53,7 @@ export function PositionCard({
       <div
         className={cn(
           "h-0.5 w-full",
-          inRange
-            ? "bg-linear-to-r from-emerald-400 via-cyan-300 to-transparent"
-            : "bg-linear-to-r from-amber-400 via-rose-400 to-transparent",
+          inRange ? "bg-emerald-400" : "bg-amber-400",
         )}
       />
       <div className="p-5 sm:p-6">
@@ -209,10 +207,10 @@ export function PositionCard({
 function TokenPair({ position }: { position: PositionSnapshot }) {
   return (
     <div className="relative h-11 w-[66px] shrink-0">
-      <div className="absolute left-0 grid size-11 place-items-center rounded-2xl bg-linear-to-br from-violet-500 to-pink-400 text-xs font-bold text-white ring-4 ring-card">
+      <div className="absolute left-0 grid size-11 place-items-center rounded-2xl bg-violet-600 text-xs font-bold text-white ring-4 ring-card">
         {position.token0.symbol.slice(0, 2)}
       </div>
-      <div className="absolute right-0 grid size-11 place-items-center rounded-2xl bg-linear-to-br from-cyan-400 to-blue-500 text-xs font-bold text-[#10101d] ring-4 ring-card">
+      <div className="absolute right-0 grid size-11 place-items-center rounded-2xl bg-cyan-400 text-xs font-bold text-[#10101d] ring-4 ring-card">
         {position.token1.symbol.slice(0, 2)}
       </div>
     </div>

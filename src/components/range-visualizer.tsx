@@ -40,12 +40,12 @@ export function RangeVisualizer({
 
       <div className="relative mt-8 px-1">
         <div className="h-2 rounded-full bg-[#0e0c19] ring-1 ring-white/[0.055]">
-          <div className="h-full w-full rounded-full bg-linear-to-r from-violet-500/70 via-cyan-400/75 to-violet-500/70" />
+          <div className="h-full w-full rounded-full bg-violet-500/70" />
         </div>
         <div
           aria-label={`Current price is ${progress.placement} the range`}
           className={cn(
-            "absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[#171426] shadow-[0_0_0_2px_rgba(255,255,255,.08),0_0_20px_currentColor]",
+            "absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[#171426] ring-2 ring-white/10",
             isInside ? "bg-cyan-300 text-cyan-300" : "bg-amber-300 text-amber-300",
           )}
           style={{ left: `${progress.percent}%` }}

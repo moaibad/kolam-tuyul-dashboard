@@ -45,7 +45,7 @@ export function WalletSearch({
         </div>
         <Button
           type="submit"
-          className="h-12 rounded-xl bg-linear-to-r from-violet-600 to-violet-500 px-6 text-white shadow-[0_10px_30px_rgba(124,58,237,.2)] hover:from-violet-500 hover:to-violet-400"
+          className="h-12 rounded-xl bg-violet-600 px-6 text-white shadow-[0_10px_28px_rgba(0,0,0,.2)] hover:bg-violet-500"
         >
           <Search className="size-4" />
           Track positions

@@ -48,7 +48,7 @@ export function PortfolioSummary({
     {
       label: "Current LP value",
       value: formatMaybeCurrency(portfolio.totals.currentLpValueUsdg),
-      detail: "Across all positions",
+      detail: `Across ${portfolio.positions.length} positions`,
       icon: Activity,
       accent: "blue",
     },
@@ -76,38 +76,55 @@ export function PortfolioSummary({
         portfolio.totals.profitLossUsdg >= 0
           ? "green"
           : "red",
+      emphasize: true,
     },
   ] as const;
 
   return (
     <section aria-label="Portfolio overview">
-      <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-6">
         {metrics.map((metric) => (
           <article
             key={metric.label}
-            className="group relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.055] bg-card/85 p-4 shadow-[0_12px_40px_rgba(0,0,0,.14)] transition-colors hover:border-white/10 sm:p-5"
+            className="group flex min-h-40 min-w-0 flex-col rounded-2xl border border-white/[0.065] bg-[#1b182b] p-4 shadow-[0_12px_36px_rgba(0,0,0,.16)] transition-colors hover:border-white/12 sm:p-5"
           >
-            <div
+            <div className="flex items-center justify-between gap-3">
+              <div
+                className={cn(
+                  "flex min-w-0 items-center gap-2",
+                  accentText[metric.accent],
+                )}
+              >
+                <metric.icon className="size-3.5 shrink-0" />
+                <p className="truncate text-[10px] font-semibold tracking-[0.1em] text-slate-400 uppercase">
+                  {metric.label}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full",
+                  accentDot[metric.accent],
+                )}
+              />
+            </div>
+
+            <p
               className={cn(
-                "absolute -top-8 -right-8 size-24 rounded-full opacity-[0.08] blur-2xl",
-                accentBackground[metric.accent],
-              )}
-            />
-            <div
-              className={cn(
-                "mb-5 grid size-9 place-items-center rounded-xl",
-                accentIcon[metric.accent],
+                "mt-4 truncate text-xl font-semibold tracking-tight text-slate-50 2xl:text-2xl",
+                "emphasize" in metric &&
+                  metric.emphasize &&
+                  accentText[metric.accent],
               )}
             >
-              <metric.icon className="size-4" />
-            </div>
-            <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
-              {metric.label}
-            </p>
-            <p className="mt-1.5 truncate text-base font-semibold tracking-tight text-slate-50 sm:text-lg">
               {metric.value}
             </p>
-            <p className="mt-1 truncate text-[11px] text-slate-600">
+
+            <p
+              className={cn(
+                "mt-auto w-fit max-w-full truncate rounded-md border px-2 py-1 text-[10px]",
+                accentBadge[metric.accent],
+              )}
+            >
               {metric.detail}
             </p>
           </article>
@@ -117,7 +134,16 @@ export function PortfolioSummary({
   );
 }
 
-const accentBackground = {
+const accentText = {
+  violet: "text-violet-300",
+  cyan: "text-cyan-300",
+  blue: "text-blue-300",
+  pink: "text-pink-300",
+  green: "text-emerald-300",
+  red: "text-rose-300",
+};
+
+const accentDot = {
   violet: "bg-violet-400",
   cyan: "bg-cyan-400",
   blue: "bg-blue-400",
@@ -126,13 +152,13 @@ const accentBackground = {
   red: "bg-rose-400",
 };
 
-const accentIcon = {
-  violet: "bg-violet-400/10 text-violet-300 ring-1 ring-violet-400/10",
-  cyan: "bg-cyan-400/10 text-cyan-300 ring-1 ring-cyan-400/10",
-  blue: "bg-blue-400/10 text-blue-300 ring-1 ring-blue-400/10",
-  pink: "bg-pink-400/10 text-pink-300 ring-1 ring-pink-400/10",
-  green: "bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/10",
-  red: "bg-rose-400/10 text-rose-300 ring-1 ring-rose-400/10",
+const accentBadge = {
+  violet: "border-violet-400/15 bg-violet-400/[0.07] text-violet-200/75",
+  cyan: "border-cyan-400/15 bg-cyan-400/[0.07] text-cyan-200/75",
+  blue: "border-blue-400/15 bg-blue-400/[0.07] text-blue-200/75",
+  pink: "border-pink-400/15 bg-pink-400/[0.07] text-pink-200/75",
+  green: "border-emerald-400/15 bg-emerald-400/[0.07] text-emerald-200/75",
+  red: "border-rose-400/15 bg-rose-400/[0.07] text-rose-200/75",
 };
 
 function formatMaybeCurrency(value: number | null) {
