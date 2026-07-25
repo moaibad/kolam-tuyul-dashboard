@@ -1,4 +1,3 @@
-import { Waves } from "lucide-react";
 import Link from "next/link";
 
 import { SidebarContent } from "@/components/sidebar-content";
@@ -11,13 +10,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/"
             aria-label="KolamTuyul home"
-            className="flex shrink-0 items-center gap-2.5 text-slate-100"
+            className="group flex shrink-0 items-center gap-2.5"
           >
-            <span className="grid size-9 place-items-center rounded-xl bg-violet-600 text-white shadow-[0_6px_18px_rgba(0,0,0,.22)]">
-              <Waves className="size-[18px]" />
+            <span className="size-9 overflow-hidden rounded-xl shadow-[0_6px_18px_rgba(0,0,0,.22)] ring-1 ring-violet-300/20 transition-transform duration-200 group-hover:scale-[1.04]">
+              <picture>
+                <source
+                  srcSet="/brand/kolam-tuyul-logo.avif"
+                  type="image/avif"
+                />
+                <img
+                  src="/brand/kolam-tuyul-logo.png"
+                  alt=""
+                  width="36"
+                  height="36"
+                  className="size-9 object-cover"
+                />
+              </picture>
             </span>
-            <span className="hidden font-semibold tracking-tight sm:inline">
-              KolamTuyul
+            <span className="hidden font-semibold tracking-[-0.02em] sm:inline">
+              <span className="text-[#f0d5ff]">Kolam</span>
+              <span className="text-[#c084fc]">Tuyul</span>
             </span>
           </Link>
 

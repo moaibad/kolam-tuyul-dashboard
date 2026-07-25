@@ -17,6 +17,21 @@ export const metadata: Metadata = {
   title: "Position Tracker | KolamTuyul",
   description:
     "Track Uniswap liquidity positions on Robinhood Chain without connecting a wallet.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      {
+        url: "/brand/kolam-tuyul-icon.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+      {
+        url: "/brand/kolam-tuyul-logo.avif",
+        type: "image/avif",
+        sizes: "640x640",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
