@@ -10,9 +10,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/"
             aria-label="KolamTuyul home"
-            className="group flex shrink-0 items-center gap-2.5"
+            className="flex shrink-0 items-center gap-2.5 text-slate-100 transition-colors hover:text-white"
           >
-            <span className="size-9 overflow-hidden rounded-xl shadow-[0_6px_18px_rgba(0,0,0,.22)] ring-1 ring-violet-300/20 transition-transform duration-200 group-hover:scale-[1.04]">
+            <span className="size-9 overflow-hidden rounded-xl shadow-[0_6px_18px_rgba(0,0,0,.22)]">
               <picture>
                 <source
                   srcSet="/brand/kolam-tuyul-logo.avif"
@@ -27,9 +27,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 />
               </picture>
             </span>
-            <span className="hidden font-semibold tracking-[-0.02em] sm:inline">
-              <span className="text-[#f0d5ff]">Kolam</span>
-              <span className="text-[#c084fc]">Tuyul</span>
+            <span className="hidden text-sm font-semibold tracking-[-0.015em] sm:inline">
+              KolamTuyul
             </span>
           </Link>
 

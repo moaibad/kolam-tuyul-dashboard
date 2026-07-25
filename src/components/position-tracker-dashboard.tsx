@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { DashboardPageHeader } from "@/components/dashboard-page-header";
 import { DashboardLoading } from "@/components/dashboard-loading";
 import { EmptyState } from "@/components/empty-state";
 import { PortfolioSummary } from "@/components/portfolio-summary";
@@ -166,21 +167,15 @@ export function PositionTrackerDashboard({
   return (
     <AppShell>
       <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden">
-        <header className="border-b border-white/[0.055] bg-[#11101e]/90">
-          <div className="mx-auto flex min-h-20 min-w-0 max-w-[1800px] items-center justify-between gap-4 px-5 sm:px-7 xl:px-10">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold tracking-tight text-slate-50">
-                  Position Tracker
-                </h1>
-                <Badge className="border-violet-400/15 bg-violet-400/8 text-[9px] font-semibold tracking-wider text-violet-200 uppercase">
-                  {demoMode ? "Demo data" : "Live data"}
-                </Badge>
-              </div>
-              <p className="mt-1 hidden text-xs text-slate-600 sm:block">
-                Monitor your Uniswap liquidity performance
-              </p>
-            </div>
+        <DashboardPageHeader
+          title="Position Tracker"
+          subtitle="Monitor your Uniswap liquidity performance"
+          titleAccessory={
+            <Badge className="border-violet-400/15 bg-violet-400/8 text-[9px] font-semibold tracking-wider text-violet-200 uppercase">
+              {demoMode ? "Demo data" : "Live data"}
+            </Badge>
+          }
+          actions={
             <div className="flex items-center gap-2">
               <div className="hidden items-center px-2 py-2 text-[11px] text-slate-500 sm:flex">
                 Robinhood Chain
@@ -198,8 +193,8 @@ export function PositionTrackerDashboard({
                 />
               </Button>
             </div>
-          </div>
-        </header>
+          }
+        />
 
         <div className="mx-auto min-w-0 max-w-[1800px] px-5 py-6 sm:px-7 sm:py-8 xl:px-10">
           <section className="relative min-w-0 max-w-full overflow-hidden border-b border-white/[0.06] pb-7 sm:pb-9">
