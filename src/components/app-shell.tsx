@@ -1,54 +1,31 @@
-"use client";
-
-import { Menu } from "lucide-react";
+import { Waves } from "lucide-react";
+import Link from "next/link";
 
 import { SidebarContent } from "@/components/sidebar-content";
-import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-background">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/6 bg-sidebar lg:block">
-        <SidebarContent />
-      </aside>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[72px] border-r border-white/6 bg-sidebar md:block lg:hidden">
-        <SidebarContent compact />
-      </aside>
+      <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-sidebar/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-[1800px] items-center justify-between gap-4 px-5 sm:px-7 xl:px-10">
+          <Link
+            href="/"
+            aria-label="KolamTuyul home"
+            className="flex shrink-0 items-center gap-2.5 text-slate-100"
+          >
+            <span className="grid size-9 place-items-center rounded-xl bg-linear-to-br from-violet-500 to-cyan-400 text-white shadow-[0_6px_20px_rgba(124,58,237,.25)]">
+              <Waves className="size-[18px]" />
+            </span>
+            <span className="hidden font-semibold tracking-tight sm:inline">
+              KolamTuyul
+            </span>
+          </Link>
 
-      <div className="w-screen min-w-0 max-w-full md:w-full md:pl-[72px] lg:pl-64">
-        <div className="fixed top-4 left-4 z-40 md:hidden">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Open navigation"
-                className="border-white/10 bg-[#19162b]/90 text-slate-100 backdrop-blur-xl"
-              >
-                <Menu />
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="left"
-              className="w-[280px] border-white/8 bg-sidebar p-0"
-            >
-              <SheetTitle className="sr-only">Navigation</SheetTitle>
-              <SheetDescription className="sr-only">
-                KolamTuyul dashboard navigation
-              </SheetDescription>
-              <SidebarContent />
-            </SheetContent>
-          </Sheet>
+          <SidebarContent />
         </div>
-        {children}
-      </div>
+      </header>
+
+      <div className="w-full min-w-0">{children}</div>
     </div>
   );
 }

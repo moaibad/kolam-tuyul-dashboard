@@ -165,7 +165,7 @@ export function PositionTrackerDashboard({
     <AppShell>
       <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden">
         <header className="border-b border-white/[0.055] bg-[#11101e]/70 backdrop-blur-xl">
-          <div className="mx-auto flex min-h-20 min-w-0 max-w-[1800px] items-center justify-between gap-4 px-5 pl-20 sm:px-7 sm:pl-7 xl:px-10">
+          <div className="mx-auto flex min-h-20 min-w-0 max-w-[1800px] items-center justify-between gap-4 px-5 sm:px-7 xl:px-10">
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-semibold tracking-tight text-slate-50">
