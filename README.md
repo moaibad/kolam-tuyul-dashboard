@@ -30,7 +30,7 @@ never requests a wallet connection, signature, private key, or seed phrase.
   after principal withdrawal is detected and valued successfully; active or
   pending-withdrawal liquidity is excluded.
 - Keeps blockchain and Blockscout access on the server.
-- Uses the same Turso schema and accounting checkpoints as the notifier.
+- Stores accounting checkpoints in Turso for resumable historical scans.
 - Preserves available real-time data when historical accounting is incomplete
   and resumes from the last completed block.
 
@@ -38,36 +38,30 @@ never requests a wallet connection, signature, private key, or seed phrase.
 
 - Node.js 20 or newer
 - npm
+- A Turso database with its URL and a full-access auth token
 - Network access to the Robinhood Chain public RPC and Blockscout
 
-## Local development
+## Setup
 
 ```bash
 npm install
+```
+
+Create `.env` from `.env.example` and set the required values:
+
+```env
+ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com
+TURSO_DATABASE_URL=libsql://your-database.turso.io
+TURSO_AUTH_TOKEN=your-auth-token
+```
+
+```bash
 npm run db:migrate
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), then enter a public EVM
-wallet address. The selected address is kept only in the dashboard's local
-component state and is cleared when the page reloads.
-
-## Production
-
-```bash
-npm install
-npm run build
-npm run start
-```
-
-Configure `ROBINHOOD_RPC_URL`, `TURSO_DATABASE_URL`, and `TURSO_AUTH_TOKEN` as
-server-only environment variables. Historical accounting is committed in
-atomic block groups and shared with the notifier. When only part of a scan
-fails, current position data remains visible, the checkpoint is retained, and
-unsafe accounting values are shown as partial or unavailable.
-
-The notifier carries the same migration history. Migration jobs for the shared
-database must not run concurrently.
+Open [http://localhost:3000](http://localhost:3000). Keep `.env` out of version
+control and never expose `TURSO_AUTH_TOKEN` in client-side code.
 
 ## API
 
