@@ -1,22 +1,28 @@
 "use client";
 
 import {
+  AlertTriangle,
   ArrowDownRight,
+  ArrowUpRight as ExternalLink,
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
   CalendarDays,
+  RefreshCw,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { WalletSearch } from "@/components/wallet-search";
+import { httpPortfolioCalendarDataSource } from "@/lib/http-portfolio-calendar-data-source";
 import {
   getDayPnl,
   getMonthAnalytics,
   type PortfolioCalendarDay,
   type PortfolioCalendarMonth,
 } from "@/lib/portfolio-calendar";
-import { formatNumber, formatSignedCurrency } from "@/lib/format";
+import { portfolioCalendarMock } from "@/lib/portfolio-calendar-mock";
+import { formatCurrency, formatNumber, formatSignedCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -34,11 +40,205 @@ const DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
 });
 
 export function PortfolioPnlCalendar({
+  demoMode = false,
+}: {
+  demoMode?: boolean;
+}) {
+  const currentMonth = getBangkokMonth();
+  const [address, setAddress] = useState("");
+  const [displayedAddress, setDisplayedAddress] = useState("");
+  const [months, setMonths] = useState<PortfolioCalendarMonth[]>(
+    demoMode ? portfolioCalendarMock : [],
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [progress, setProgress] = useState("");
+  const activeAddressRef = useRef("");
+  const latestRequestRef = useRef(0);
+  const inFlightRef = useRef<{
+    address: string;
+    promise: Promise<void>;
+  } | null>(null);
+
+  function load(walletAddress: string) {
+    const normalizedAddress = walletAddress.toLowerCase();
+    if (inFlightRef.current?.address === normalizedAddress) {
+      return inFlightRef.current.promise;
+    }
+
+    const requestId = ++latestRequestRef.current;
+    activeAddressRef.current = normalizedAddress;
+    setAddress(walletAddress);
+    setIsLoading(true);
+    setError("");
+    setProgress("Loading saved realized PnL…");
+    if (
+      displayedAddress &&
+      displayedAddress.toLowerCase() !== normalizedAddress
+    ) {
+      setMonths([]);
+      setDisplayedAddress("");
+    }
+
+    const isCurrentRequest = () =>
+      activeAddressRef.current === normalizedAddress &&
+      latestRequestRef.current === requestId;
+
+    const promise = (async () => {
+      let hasCachedCalendar = false;
+      try {
+        const cached = await httpPortfolioCalendarDataSource.get(
+          walletAddress,
+          currentMonth,
+        );
+        if (!isCurrentRequest()) return;
+        hasCachedCalendar = true;
+        setMonths([cached.month]);
+        setDisplayedAddress(walletAddress);
+        setProgress(syncMessage(cached.backfill.state));
+        setError(cached.backfill.error ?? "");
+      } catch (cacheError) {
+        if (!isCurrentRequest()) return;
+        setProgress("Discovering withdrawn LP positions…");
+        setError(
+          cacheError instanceof Error
+            ? cacheError.message
+            : "Saved realized PnL could not be loaded.",
+        );
+      }
+
+      try {
+        const backfill =
+          await httpPortfolioCalendarDataSource.backfill(walletAddress);
+        if (!isCurrentRequest()) return;
+        if (backfill.error) setError(backfill.error);
+
+        const refreshed = await httpPortfolioCalendarDataSource.get(
+          walletAddress,
+          currentMonth,
+        );
+        if (!isCurrentRequest()) return;
+        setMonths([refreshed.month]);
+        setDisplayedAddress(walletAddress);
+        setProgress(
+          refreshed.backfill.state === "complete"
+            ? "Realized history is up to date"
+            : `Indexed ${refreshed.backfill.completed} of ${refreshed.backfill.total} positions`,
+        );
+        setError(refreshed.backfill.error ?? "");
+      } catch (syncError) {
+        if (!isCurrentRequest()) return;
+        setError(
+          syncError instanceof Error
+            ? syncError.message
+            : "Realized PnL synchronization failed.",
+        );
+        if (!hasCachedCalendar) {
+          setProgress("Realized PnL history is unavailable");
+        }
+      } finally {
+        if (isCurrentRequest()) {
+          setIsLoading(false);
+        }
+        if (inFlightRef.current?.address === normalizedAddress) {
+          inFlightRef.current = null;
+        }
+      }
+    })();
+
+    inFlightRef.current = { address: normalizedAddress, promise };
+    return promise;
+  }
+
+  if (demoMode) {
+    return <CalendarView months={months} />;
+  }
+
+  return (
+    <div className="mx-auto max-w-[1800px] px-4 py-6 sm:px-7 sm:py-8 xl:px-10">
+      <section className="border-b border-white/[0.07] pb-7">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-semibold tracking-[-0.03em] text-slate-50 sm:text-4xl">
+              Realized LP performance
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
+              Only fully withdrawn positions are counted. Active and partially
+              withdrawn liquidity stays outside the calendar.
+            </p>
+          </div>
+          <div className="w-full max-w-2xl">
+            <WalletSearch onSearch={load} isLoading={isLoading} />
+          </div>
+        </div>
+      </section>
+
+      {progress && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-5 flex min-h-6 items-center gap-2 text-xs text-slate-400"
+        >
+          {isLoading ? (
+            <RefreshCw className="size-3.5 animate-spin text-violet-300" />
+          ) : (
+            <CalendarDays className="size-3.5 text-emerald-400" />
+          )}
+          {progress}
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300/20 bg-amber-300/[0.07] px-4 py-3 text-sm text-amber-100"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <AlertTriangle className="size-4 shrink-0" />
+            <span className="min-w-0 break-words">{error}</span>
+          </span>
+          {address && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isLoading}
+              onClick={() => load(address)}
+              className="border-amber-200/20 bg-amber-200/[0.06] text-amber-50 hover:bg-amber-200/10"
+            >
+              <RefreshCw className="size-3.5" />
+              Retry sync
+            </Button>
+          )}
+        </div>
+      )}
+
+      {months.length > 0 ? (
+        <CalendarView months={months} embedded />
+      ) : (
+        <div className="py-20 text-center">
+          <CalendarDays className="mx-auto size-7 text-violet-300/60" />
+          <h3 className="mt-4 text-base font-semibold text-slate-200">
+            Enter a wallet to build its realized PnL calendar
+          </h3>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+            Full withdrawals and post-closure fee claims will appear on their
+            transaction date in Bangkok time.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CalendarView({
   months,
+  embedded = false,
 }: {
   months: PortfolioCalendarMonth[];
+  embedded?: boolean;
 }) {
-  const todayMonth = "2026-07";
+  const todayMonth = getBangkokMonth();
   const initialIndex = Math.max(
     0,
     months.findIndex((month) => month.month === todayMonth),
@@ -76,7 +276,11 @@ export function PortfolioPnlCalendar({
   };
 
   return (
-    <div className="mx-auto max-w-[1800px] px-4 py-6 sm:px-7 sm:py-8 xl:px-10">
+    <div
+      className={cn(
+        embedded ? "pt-8" : "mx-auto max-w-[1800px] px-4 py-6 sm:px-7 sm:py-8 xl:px-10",
+      )}
+    >
       {/* THESIS: Daily portfolio performance becomes a navigable field, not a row of disconnected KPI cards.
           OWN-WORLD: Ink-violet surfaces, precise dividers, emerald/rose PnL fields, and restrained violet controls.
           STORY: Scan the month, recognize momentum, select a date, then trace the result back to each LP position.
@@ -89,7 +293,7 @@ export function PortfolioPnlCalendar({
               <span className="grid size-8 place-items-center rounded-lg bg-violet-500/12">
                 <CalendarDays className="size-4" />
               </span>
-              Monthly performance
+              Monthly realized PnL
             </div>
             <h2
               id="monthly-performance-title"
@@ -98,7 +302,7 @@ export function PortfolioPnlCalendar({
               {formatSignedCurrency(analytics.totalPnl)}
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Aggregated PnL across {analytics.activeDays} active days
+              {analytics.activeDays} days with completed withdrawals or late fee claims
               {monthDelta != null && (
                 <span
                   className={cn(
@@ -316,7 +520,7 @@ function CalendarCell({
                 : "text-rose-100/70",
           )}
         >
-          {active ? "End-of-day snapshot" : "No activity"}
+          {active ? "Realized event" : "No realized PnL"}
         </p>
       </div>
     </button>
@@ -346,7 +550,7 @@ function DayDetail({ day }: { day: PortfolioCalendarDay }) {
           </h3>
         </div>
         <div className="sm:text-right">
-          <p className="text-xs text-slate-500">Combined position PnL</p>
+          <p className="text-xs text-slate-500">Combined realized PnL</p>
           <p
             className={cn(
               "mt-1 text-2xl font-semibold tracking-[-0.025em]",
@@ -390,22 +594,48 @@ function DayDetail({ day }: { day: PortfolioCalendarDay }) {
                     </p>
                   </div>
                 </div>
-                <div className="sm:min-w-28 sm:text-right">
-                  <p className="text-[10px] text-slate-500">Contribution</p>
-                  <p className="mt-1 text-sm text-slate-300">
-                    {formatNumber(contribution, 1)}%
-                  </p>
+                <div className="grid grid-cols-3 gap-4 sm:min-w-[360px]">
+                  <DetailValue
+                    label="Deposited"
+                    value={formatCurrency(position.depositedUsdg ?? 0)}
+                  />
+                  <DetailValue
+                    label="Withdrawn"
+                    value={formatCurrency(position.withdrawnUsdg ?? 0)}
+                  />
+                  <DetailValue
+                    label="Claimed fees"
+                    value={formatCurrency(position.claimedFeesUsdg ?? 0)}
+                  />
                 </div>
-                <p
-                  className={cn(
-                    "text-base font-semibold sm:min-w-28 sm:text-right",
-                    position.pnl >= 0
-                      ? "text-emerald-300"
-                      : "text-rose-300",
+                <div className="flex items-center justify-between gap-3 sm:min-w-32 sm:block sm:text-right">
+                  <p
+                    className={cn(
+                      "text-base font-semibold",
+                      position.pnl >= 0
+                        ? "text-emerald-300"
+                        : "text-rose-300",
+                    )}
+                  >
+                    {formatSignedCurrency(position.pnl)}
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    {position.kind === "late_fee"
+                      ? "Late fee claim"
+                      : `Lifecycle ${position.lifecycle ?? 1} closure`}{" "}
+                    · {formatNumber(contribution, 1)}%
+                  </p>
+                  {position.transactionUrl && (
+                    <a
+                      href={position.transactionUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-[11px] text-violet-300 hover:text-violet-200"
+                    >
+                      Transaction <ExternalLink className="size-3" />
+                    </a>
                   )}
-                >
-                  {formatSignedCurrency(position.pnl)}
-                </p>
+                </div>
               </div>
             );
           })}
@@ -414,14 +644,23 @@ function DayDetail({ day }: { day: PortfolioCalendarDay }) {
         <div className="px-5 py-12 text-center sm:px-6">
           <CalendarDays className="mx-auto size-6 text-slate-600" />
           <p className="mt-3 text-sm font-medium text-slate-300">
-            No position snapshots for this day
+            No realized PnL for this day
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Select another date to inspect its PnL contribution.
+            Active and partially withdrawn positions are intentionally excluded.
           </p>
         </div>
       )}
     </section>
+  );
+}
+
+function DetailValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className="mt-1 truncate text-xs font-medium text-slate-300">{value}</p>
+    </div>
   );
 }
 
@@ -471,4 +710,26 @@ function buildCalendarCells(month: string) {
   }
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
+}
+
+function getBangkokMonth() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  return `${year}-${month}`;
+}
+
+function syncMessage(
+  state: "idle" | "running" | "complete" | "partial" | "failed",
+) {
+  if (state === "complete") return "Checking for new withdrawals…";
+  if (state === "partial" || state === "failed") {
+    return "Resuming realized PnL history…";
+  }
+  if (state === "running") return "Synchronizing realized PnL history…";
+  return "Discovering withdrawn LP positions…";
 }

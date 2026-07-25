@@ -92,6 +92,52 @@ export const accountingSyncLeases = sqliteTable('accounting_sync_leases', {
   expiresAtMs: integer('expires_at_ms').notNull(),
 })
 
+export const positionLiquidityEvents = sqliteTable('position_liquidity_events', {
+  positionId: text('position_id').notNull(),
+  txHash: text('tx_hash').notNull(),
+  logIndex: integer('log_index').notNull(),
+  blockNumber: text('block_number').notNull(),
+  timestampMs: integer('timestamp_ms').notNull(),
+  liquidityDelta: text('liquidity_delta').notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.positionId, table.txHash, table.logIndex] }),
+  index('position_liquidity_position_block_idx').on(table.positionId, table.blockNumber),
+])
+
+export const realizedPositionEvents = sqliteTable('realized_position_events', {
+  eventKey: text('event_key').primaryKey(),
+  walletAddress: text('wallet_address').notNull(),
+  positionId: text('position_id').notNull(),
+  lifecycle: integer('lifecycle').notNull(),
+  kind: text('kind').notNull(),
+  dateKey: text('date_key').notNull(),
+  version: text('version').notNull(),
+  pair: text('pair').notNull(),
+  depositedUsdg: real('deposited_usdg').notNull(),
+  withdrawnUsdg: real('withdrawn_usdg').notNull(),
+  claimedFeesUsdg: real('claimed_fees_usdg').notNull(),
+  pnlUsdg: real('pnl_usdg').notNull(),
+  blockNumber: text('block_number').notNull(),
+  txHash: text('tx_hash').notNull(),
+  status: text('status').notNull(),
+  error: text('error'),
+}, (table) => [
+  index('realized_events_wallet_date_idx').on(table.walletAddress, table.dateKey),
+  index('realized_events_position_idx').on(table.positionId),
+])
+
+export const calendarBackfills = sqliteTable('calendar_backfills', {
+  walletAddress: text('wallet_address').primaryKey(),
+  state: text('state').notNull(),
+  completed: integer('completed').notNull(),
+  total: integer('total').notNull(),
+  retryable: integer('retryable', { mode: 'boolean' }).notNull(),
+  error: text('error'),
+  leaseOwnerId: text('lease_owner_id'),
+  leaseExpiresAtMs: integer('lease_expires_at_ms'),
+  updatedAtMs: integer('updated_at_ms').notNull(),
+})
+
 export const schema = {
   syncState,
   positions,
@@ -103,4 +149,7 @@ export const schema = {
   discordReportMessages,
   referencePools,
   accountingSyncLeases,
+  positionLiquidityEvents,
+  realizedPositionEvents,
+  calendarBackfills,
 }

@@ -9,6 +9,7 @@ import { buildPositionSnapshot, createPriceOracle, loadPositionData } from './un
 import { syncPositionAccounting } from './uniswap/accounting-sync'
 import { discoverReferencePriceSources } from './uniswap/reference-pools'
 import type { PoolPriceSource } from './uniswap/price-oracle'
+import { persistRealizedPositionEvents } from './realized-pnl'
 
 export class RefreshService {
   private running?: Promise<RefreshResult>
@@ -64,8 +65,16 @@ export class RefreshService {
       warnings.push(`Reference price pool discovery failed: ${error instanceof Error ? error.message : String(error)}`)
     }
     const oracle = createPriceOracle(positionData, this.config.usdgAddress, referenceSources, this.config.wethAddress)
-    for (const data of positionData.filter((position) => position.liquidity > 0n)) {
+    for (const data of positionData) {
       await syncPositionAccounting({ client: this.client, db: this.db, data, oracle, deployments: this.deployments, blockNumber })
+      await persistRealizedPositionEvents({
+        db: this.db,
+        walletAddress: this.config.walletAddress,
+        positionId: data.id,
+        version: data.position.version,
+        pair: `${data.token0.symbol} / ${data.token1.symbol}`,
+      })
+      if (data.liquidity === 0n) continue
       const snapshot = await buildPositionSnapshot({ client: this.client, db: this.db, data, oracle, walletAddress: this.config.walletAddress, blockNumber, nowMs })
       if (!snapshot) continue
       const previous = await this.db.getPositionStatus(snapshot.id)

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/components/app-shell";
 import { PortfolioPnlCalendar } from "@/components/portfolio-pnl-calendar";
-import { portfolioCalendarMock } from "@/lib/portfolio-calendar-mock";
 
 export const metadata: Metadata = {
   title: "Portfolio Calendar | KolamTuyul",
@@ -20,12 +19,12 @@ export default function PortfolioCalendarPage() {
                 Portfolio Calendar
               </h1>
               <p className="mt-1 text-xs text-slate-500">
-                Daily PnL snapshots across every active LP position
+                Realized results from fully withdrawn LP positions
               </p>
             </div>
           </div>
         </header>
-        <PortfolioPnlCalendar months={portfolioCalendarMock} />
+        <PortfolioPnlCalendar demoMode={process.env.DEMO_MODE === "true"} />
       </main>
     </AppShell>
   );

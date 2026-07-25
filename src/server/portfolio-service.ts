@@ -29,7 +29,7 @@ export class InvalidWalletAddressError extends Error {}
 
 let databasePromise: Promise<StateDatabase> | undefined;
 
-function getDatabase() {
+export function getStateDatabase() {
   if (!databasePromise) {
     databasePromise = (async () => {
       const url = process.env.TURSO_DATABASE_URL;
@@ -70,7 +70,7 @@ export async function getLivePortfolio(
     pricePoolCacheMs: 0,
     priceRouteIntermediateTokens: [WETH_ADDRESS],
   };
-  const database = await getDatabase();
+  const database = await getStateDatabase();
   const service = new RefreshService(
     config,
     createChainClient(config),

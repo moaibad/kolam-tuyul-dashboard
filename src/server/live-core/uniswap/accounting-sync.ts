@@ -19,7 +19,6 @@ export async function syncPositionAccounting(input: {
   deployments: DeploymentAddresses
   blockNumber: bigint
 }) {
-  if (input.data.liquidity === 0n) return
   const leaseOwnerId = randomUUID()
   if (!(await input.db.acquireAccountingLease(input.data.id, leaseOwnerId))) return
   try {
@@ -41,7 +40,13 @@ export async function syncPositionAccounting(input: {
 async function syncV4(input: Parameters<typeof syncPositionAccounting>[0] & { mintBlock: bigint; leaseOwnerId: string }) {
   if (!input.deployments.v4PoolManager || !input.deployments.v4StateView || !input.data.poolId) throw new Error('Uniswap v4 accounting contracts are not configured')
   const existing = await input.db.getAccounting(input.data.id)
-  const fromBlock = existing.lastSyncedBlock != null ? existing.lastSyncedBlock + 1n : input.mintBlock
+  const storedLiquidityEvents = await input.db.listLiquidityEvents(input.data.id)
+  const replayLiquidityOnly = storedLiquidityEvents.length === 0 && existing.lastSyncedBlock != null
+  const fromBlock = storedLiquidityEvents.length === 0
+    ? input.mintBlock
+    : existing.lastSyncedBlock != null
+      ? existing.lastSyncedBlock + 1n
+      : input.mintBlock
   if (fromBlock > input.blockNumber) return
   const logs = await getEventsChunked(input.client, {
     address: input.deployments.v4PoolManager,
@@ -115,7 +120,15 @@ async function syncV4(input: Parameters<typeof syncPositionAccounting>[0] & { mi
       positionId: input.data.id,
       blockNumber: log.blockNumber,
       status: log.blockNumber === input.blockNumber ? 'synced' : 'partial',
-      cashflows,
+      cashflows: replayLiquidityOnly ? [] : cashflows,
+      liquidityEvents: [{
+        positionId: input.data.id,
+        txHash: log.transactionHash,
+        logIndex: log.logIndex,
+        blockNumber: log.blockNumber,
+        timestampMs,
+        liquidityDelta: log.args.liquidityDelta,
+      }],
       leaseOwnerId: input.leaseOwnerId,
     })
   }
@@ -123,7 +136,13 @@ async function syncV4(input: Parameters<typeof syncPositionAccounting>[0] & { mi
 
 async function syncV3(input: Parameters<typeof syncPositionAccounting>[0] & { mintBlock: bigint; leaseOwnerId: string }) {
   const existing = await input.db.getAccounting(input.data.id)
-  const fromBlock = existing.lastSyncedBlock != null ? existing.lastSyncedBlock + 1n : input.mintBlock
+  const storedLiquidityEvents = await input.db.listLiquidityEvents(input.data.id)
+  const replayLiquidityOnly = storedLiquidityEvents.length === 0 && existing.lastSyncedBlock != null
+  const fromBlock = storedLiquidityEvents.length === 0
+    ? input.mintBlock
+    : existing.lastSyncedBlock != null
+      ? existing.lastSyncedBlock + 1n
+      : input.mintBlock
   if (fromBlock > input.blockNumber) return
   const [increases, decreases, collects] = await Promise.all([
     getEventsChunked(input.client, { address: input.data.position.manager, abi: v3PositionManagerAbi, eventName: 'IncreaseLiquidity', args: { tokenId: input.data.position.tokenId }, fromBlock, toBlock: input.blockNumber }),
@@ -143,6 +162,7 @@ async function syncV3(input: Parameters<typeof syncPositionAccounting>[0] & { mi
     const blockNumber = blockEvents[0]!.log.blockNumber!
     const timestampMs = await blockTimestamp(input.client, blockNumber)
     const cashflows: PositionCashflowWrite[] = []
+    const liquidityEvents = []
     for (const event of blockEvents) {
       const { log } = event
       if (log.transactionHash == null || log.logIndex == null) continue
@@ -152,6 +172,14 @@ async function syncV3(input: Parameters<typeof syncPositionAccounting>[0] & { mi
         pending0 += decrease0
         pending1 += decrease1
         cashflows.push({ positionId: input.data.id, txHash: log.transactionHash, logIndex: log.logIndex, blockNumber, timestampMs, type: 'decrease', token0Raw: decrease0, token1Raw: decrease1, valueUsdg: 0 })
+        liquidityEvents.push({
+          positionId: input.data.id,
+          txHash: log.transactionHash,
+          logIndex: log.logIndex,
+          blockNumber,
+          timestampMs,
+          liquidityDelta: -(log.args.liquidity ?? 0n),
+        })
         continue
       }
       const raw0 = log.args.amount0 ?? 0n
@@ -173,6 +201,16 @@ async function syncV3(input: Parameters<typeof syncPositionAccounting>[0] & { mi
         amount1 = raw1 - principal1
         type = 'fee'
       }
+      if (event.kind === 'increase') {
+        liquidityEvents.push({
+          positionId: input.data.id,
+          txHash: log.transactionHash,
+          logIndex: log.logIndex,
+          blockNumber,
+          timestampMs,
+          liquidityDelta: log.args.liquidity ?? 0n,
+        })
+      }
       if (amount0 === 0n && amount1 === 0n) continue
       const value = await valuePair(input.oracle, input.data, amount0, amount1, blockNumber)
       cashflows.push({ positionId: input.data.id, txHash: log.transactionHash, logIndex: log.logIndex, blockNumber, timestampMs, type, token0Raw: amount0, token1Raw: amount1, valueUsdg: value })
@@ -181,15 +219,18 @@ async function syncV3(input: Parameters<typeof syncPositionAccounting>[0] & { mi
       positionId: input.data.id,
       blockNumber,
       status: blockNumber === input.blockNumber ? 'synced' : 'partial',
-      cashflows,
+      cashflows: replayLiquidityOnly ? [] : cashflows,
+      liquidityEvents,
       leaseOwnerId: input.leaseOwnerId,
     })
   }
-  const pending = await input.db.getPendingPrincipal(input.data.id)
-  const newlyIndexed0 = pending[0] - (input.data.pendingPrincipal0 ?? 0n)
-  const newlyIndexed1 = pending[1] - (input.data.pendingPrincipal1 ?? 0n)
-  if (newlyIndexed0 > 0n) input.data.unclaimed0 = input.data.unclaimed0 > newlyIndexed0 ? input.data.unclaimed0 - newlyIndexed0 : 0n
-  if (newlyIndexed1 > 0n) input.data.unclaimed1 = input.data.unclaimed1 > newlyIndexed1 ? input.data.unclaimed1 - newlyIndexed1 : 0n
+  if (!replayLiquidityOnly) {
+    const pending = await input.db.getPendingPrincipal(input.data.id)
+    const newlyIndexed0 = pending[0] - (input.data.pendingPrincipal0 ?? 0n)
+    const newlyIndexed1 = pending[1] - (input.data.pendingPrincipal1 ?? 0n)
+    if (newlyIndexed0 > 0n) input.data.unclaimed0 = input.data.unclaimed0 > newlyIndexed0 ? input.data.unclaimed0 - newlyIndexed0 : 0n
+    if (newlyIndexed1 > 0n) input.data.unclaimed1 = input.data.unclaimed1 > newlyIndexed1 ? input.data.unclaimed1 - newlyIndexed1 : 0n
+  }
 }
 
 function groupEventsByBlock<T extends { log: { blockNumber?: bigint | null } }>(events: T[]) {

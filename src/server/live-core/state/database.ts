@@ -54,6 +54,34 @@ export interface PositionCashflowWrite {
   valueUsdg: number
 }
 
+export interface PositionLiquidityEventWrite {
+  positionId: string
+  txHash: string
+  logIndex: number
+  blockNumber: bigint
+  timestampMs: number
+  liquidityDelta: bigint
+}
+
+export interface StoredRealizedEvent {
+  eventKey: string
+  walletAddress: string
+  positionId: string
+  lifecycle: number
+  kind: 'closure' | 'late_fee'
+  dateKey: string
+  version: PositionVersion
+  pair: string
+  depositedUsdg: number
+  withdrawnUsdg: number
+  claimedFeesUsdg: number
+  pnlUsdg: number
+  blockNumber: bigint
+  txHash: string
+  status: 'complete' | 'unavailable'
+  error?: string
+}
+
 export class StateDatabase {
   readonly db: Client
   readonly orm: LibSQLDatabase<typeof schema>
@@ -222,10 +250,12 @@ export class StateDatabase {
     blockNumber: bigint
     status: AccountingStatus
     cashflows?: PositionCashflowWrite[]
+    liquidityEvents?: PositionLiquidityEventWrite[]
     error?: string
     leaseOwnerId?: string
   }) {
     const cashflows = input.cashflows ?? []
+    const liquidityEvents = input.liquidityEvents ?? []
     await this.db.batch([
       ...cashflows.map((cashflow) => statement(
         'INSERT OR IGNORE INTO position_cashflows_v2(position_id, tx_hash, log_index, block_number, timestamp_ms, type, token0_raw, token1_raw, value_usdg) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -238,6 +268,15 @@ export class StateDatabase {
         cashflow.token0Raw.toString(),
         cashflow.token1Raw.toString(),
         cashflow.valueUsdg,
+      )),
+      ...liquidityEvents.map((event) => statement(
+        'INSERT OR IGNORE INTO position_liquidity_events(position_id, tx_hash, log_index, block_number, timestamp_ms, liquidity_delta) VALUES(?, ?, ?, ?, ?, ?)',
+        event.positionId,
+        event.txHash,
+        event.logIndex,
+        event.blockNumber.toString(),
+        event.timestampMs,
+        event.liquidityDelta.toString(),
       )),
       {
         sql: `
@@ -354,6 +393,178 @@ export class StateDatabase {
       token0Raw: BigInt(String(row.token0_raw)),
       token1Raw: BigInt(String(row.token1_raw)),
     }))
+  }
+
+  async listRealizedCashflows(positionId: string) {
+    const rows = (await this.db.execute({
+      sql: `
+        SELECT tx_hash, log_index, block_number, timestamp_ms, type, value_usdg
+        FROM position_cashflows_v2
+        WHERE position_id = ? AND type IN ('deposit', 'withdrawal', 'fee')
+        ORDER BY CAST(block_number AS INTEGER), log_index
+      `,
+      args: [positionId],
+    })).rows
+    return rows.map((row) => ({
+      txHash: String(row.tx_hash),
+      logIndex: Number(row.log_index),
+      blockNumber: BigInt(String(row.block_number)),
+      timestampMs: Number(row.timestamp_ms),
+      type: String(row.type) as 'deposit' | 'withdrawal' | 'fee',
+      valueUsdg: Number(row.value_usdg),
+    }))
+  }
+
+  async listLiquidityEvents(positionId: string) {
+    const rows = (await this.db.execute({
+      sql: `
+        SELECT tx_hash, log_index, block_number, timestamp_ms, liquidity_delta
+        FROM position_liquidity_events
+        WHERE position_id = ?
+        ORDER BY CAST(block_number AS INTEGER), log_index
+      `,
+      args: [positionId],
+    })).rows
+    return rows.map((row) => ({
+      txHash: String(row.tx_hash),
+      logIndex: Number(row.log_index),
+      blockNumber: BigInt(String(row.block_number)),
+      timestampMs: Number(row.timestamp_ms),
+      liquidityDelta: BigInt(String(row.liquidity_delta)),
+    }))
+  }
+
+  async upsertRealizedEvent(event: StoredRealizedEvent) {
+    await this.execute(`
+      INSERT INTO realized_position_events(
+        event_key, wallet_address, position_id, lifecycle, kind, date_key, version, pair,
+        deposited_usdg, withdrawn_usdg, claimed_fees_usdg, pnl_usdg,
+        block_number, tx_hash, status, error
+      ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(event_key) DO UPDATE SET
+        wallet_address = excluded.wallet_address,
+        date_key = excluded.date_key,
+        pair = excluded.pair,
+        deposited_usdg = excluded.deposited_usdg,
+        withdrawn_usdg = excluded.withdrawn_usdg,
+        claimed_fees_usdg = excluded.claimed_fees_usdg,
+        pnl_usdg = excluded.pnl_usdg,
+        block_number = excluded.block_number,
+        tx_hash = excluded.tx_hash,
+        status = excluded.status,
+        error = excluded.error
+    `,
+    event.eventKey,
+    event.walletAddress.toLowerCase(),
+    event.positionId,
+    event.lifecycle,
+    event.kind,
+    event.dateKey,
+    event.version,
+    event.pair,
+    event.depositedUsdg,
+    event.withdrawnUsdg,
+    event.claimedFeesUsdg,
+    event.pnlUsdg,
+    event.blockNumber.toString(),
+    event.txHash,
+    event.status,
+    event.error ?? null)
+  }
+
+  async listRealizedEvents(walletAddress: string, month: string): Promise<StoredRealizedEvent[]> {
+    const rows = (await this.db.execute({
+      sql: `
+        SELECT event_key, wallet_address, position_id, lifecycle, kind, date_key, version, pair,
+          deposited_usdg, withdrawn_usdg, claimed_fees_usdg, pnl_usdg,
+          block_number, tx_hash, status, error
+        FROM realized_position_events
+        WHERE wallet_address = ? AND date_key LIKE ?
+        ORDER BY date_key, CAST(block_number AS INTEGER)
+      `,
+      args: [walletAddress.toLowerCase(), `${month}-%`],
+    })).rows
+    return rows.map((row) => ({
+      eventKey: String(row.event_key),
+      walletAddress: String(row.wallet_address),
+      positionId: String(row.position_id),
+      lifecycle: Number(row.lifecycle),
+      kind: String(row.kind) as StoredRealizedEvent['kind'],
+      dateKey: String(row.date_key),
+      version: String(row.version) as PositionVersion,
+      pair: String(row.pair),
+      depositedUsdg: Number(row.deposited_usdg),
+      withdrawnUsdg: Number(row.withdrawn_usdg),
+      claimedFeesUsdg: Number(row.claimed_fees_usdg),
+      pnlUsdg: Number(row.pnl_usdg),
+      blockNumber: BigInt(String(row.block_number)),
+      txHash: String(row.tx_hash),
+      status: String(row.status) as StoredRealizedEvent['status'],
+      error: row.error == null ? undefined : String(row.error),
+    }))
+  }
+
+  async getCalendarBackfill(walletAddress: string) {
+    const row = await this.first(
+      'SELECT state, completed, total, retryable, error, lease_owner_id, lease_expires_at_ms, updated_at_ms FROM calendar_backfills WHERE wallet_address = ?',
+      walletAddress.toLowerCase(),
+    )
+    if (!row) {
+      return {
+        state: 'idle' as const,
+        completed: 0,
+        total: 0,
+        retryable: true,
+        updatedAtMs: 0,
+      }
+    }
+    return {
+      state: String(row.state) as 'idle' | 'running' | 'complete' | 'partial' | 'failed',
+      completed: Number(row.completed),
+      total: Number(row.total),
+      retryable: Boolean(row.retryable),
+      error: row.error == null ? undefined : String(row.error),
+      leaseOwnerId: row.lease_owner_id == null ? undefined : String(row.lease_owner_id),
+      leaseExpiresAtMs: row.lease_expires_at_ms == null ? undefined : Number(row.lease_expires_at_ms),
+      updatedAtMs: Number(row.updated_at_ms),
+    }
+  }
+
+  async setCalendarBackfill(input: {
+    walletAddress: string
+    state: 'idle' | 'running' | 'complete' | 'partial' | 'failed'
+    completed: number
+    total: number
+    retryable: boolean
+    error?: string
+    leaseOwnerId?: string
+    leaseExpiresAtMs?: number
+    updatedAtMs?: number
+  }) {
+    await this.execute(`
+      INSERT INTO calendar_backfills(
+        wallet_address, state, completed, total, retryable, error,
+        lease_owner_id, lease_expires_at_ms, updated_at_ms
+      ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(wallet_address) DO UPDATE SET
+        state = excluded.state,
+        completed = excluded.completed,
+        total = excluded.total,
+        retryable = excluded.retryable,
+        error = excluded.error,
+        lease_owner_id = excluded.lease_owner_id,
+        lease_expires_at_ms = excluded.lease_expires_at_ms,
+        updated_at_ms = excluded.updated_at_ms
+    `,
+    input.walletAddress.toLowerCase(),
+    input.state,
+    input.completed,
+    input.total,
+    input.retryable ? 1 : 0,
+    input.error ?? null,
+    input.leaseOwnerId ?? null,
+    input.leaseExpiresAtMs ?? null,
+    input.updatedAtMs ?? Date.now())
   }
 
   async getPendingPrincipal(positionId: string): Promise<[bigint, bigint]> {

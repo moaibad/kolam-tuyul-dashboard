@@ -1,20 +1,48 @@
 export type CalendarPositionVersion = "v3" | "v4";
+export type RealizedEventKind = "closure" | "late_fee";
+export type CalendarDataStatus =
+  | "complete"
+  | "partial"
+  | "pending"
+  | "unavailable";
 
 export interface CalendarPositionPnl {
   id: string;
   pair: string;
   version: CalendarPositionVersion;
   pnl: number;
+  kind?: RealizedEventKind;
+  lifecycle?: number;
+  depositedUsdg?: number;
+  withdrawnUsdg?: number;
+  claimedFeesUsdg?: number;
+  transactionUrl?: string;
 }
 
 export interface PortfolioCalendarDay {
   date: string;
   positions: CalendarPositionPnl[];
+  status?: CalendarDataStatus;
 }
 
 export interface PortfolioCalendarMonth {
   month: string;
   days: PortfolioCalendarDay[];
+}
+
+export interface PortfolioCalendarBackfill {
+  state: "idle" | "running" | "complete" | "partial" | "failed";
+  completed: number;
+  total: number;
+  retryable: boolean;
+  error?: string;
+}
+
+export interface PortfolioCalendarResponse {
+  address: string;
+  timezone: "Asia/Bangkok";
+  month: PortfolioCalendarMonth;
+  backfill: PortfolioCalendarBackfill;
 }
 
 export interface PortfolioCalendarAnalytics {
@@ -63,4 +91,3 @@ export function getMonthAnalytics(
     activeDays: activeDays.length,
   };
 }
-
