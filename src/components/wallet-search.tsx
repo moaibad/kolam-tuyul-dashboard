@@ -56,7 +56,7 @@ export function WalletSearch({
         <Button
           type="submit"
           disabled={isLoading}
-          className="h-12 rounded-xl bg-violet-600 px-6 text-white shadow-[0_10px_28px_rgba(0,0,0,.2)] hover:bg-violet-500"
+          className="h-12 cursor-pointer rounded-xl bg-violet-600 px-6 text-white shadow-[0_10px_28px_rgba(0,0,0,.2)] hover:bg-violet-500 disabled:cursor-not-allowed"
         >
           <Search className="size-4" />
           {isLoading ? "Loading positions…" : "Track positions"}

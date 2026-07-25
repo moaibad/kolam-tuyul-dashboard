@@ -12,8 +12,6 @@ export class PortfolioDataSourceError extends Error {
   }
 }
 
-const REQUEST_TIMEOUT_MS = 20_000;
-
 export class HttpPositionDataSource implements PositionDataSource {
   async getPortfolio(address: string): Promise<PortfolioSnapshot> {
     let response: Response;
@@ -23,16 +21,9 @@ export class HttpPositionDataSource implements PositionDataSource {
         {
           cache: "no-store",
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         },
       );
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "TimeoutError") {
-        throw new PortfolioDataSourceError(
-          "The portfolio request timed out. Check your connection and try again.",
-          408,
-        );
-      }
+    } catch {
       throw new PortfolioDataSourceError(
         "The portfolio service is unreachable. Check your connection and try again.",
         0,

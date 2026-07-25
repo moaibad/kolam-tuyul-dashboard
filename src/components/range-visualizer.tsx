@@ -1,3 +1,8 @@
+"use client";
+
+import { Check, Copy } from "lucide-react";
+import { useState } from "react";
+
 import { formatPrice, getRangeProgress } from "@/lib/format";
 import type { PositionSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -13,11 +18,31 @@ export function RangeVisualizer({
     position.tickUpper,
   );
   const isInside = progress.placement === "inside";
+  const [copiedBoundary, setCopiedBoundary] = useState<
+    "lower" | "upper" | null
+  >(null);
   const statusLabel = isInside
     ? "Inside liquidity range"
     : progress.placement === "below"
       ? "Below liquidity range"
       : "Above liquidity range";
+
+  async function copyBoundary(
+    boundary: "lower" | "upper",
+    value: number,
+  ) {
+    try {
+      await navigator.clipboard.writeText(String(value));
+      setCopiedBoundary(boundary);
+      window.setTimeout(() => {
+        setCopiedBoundary((current) =>
+          current === boundary ? null : current,
+        );
+      }, 1_500);
+    } catch {
+      setCopiedBoundary(null);
+    }
+  }
 
   return (
     <div
@@ -81,19 +106,39 @@ export function RangeVisualizer({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-6">
-        <div>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => copyBoundary("lower", position.lowerPrice)}
+          className="group min-w-0 cursor-pointer rounded-lg p-2 text-left transition-colors hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          aria-label={`Copy lower price ${formatPrice(position.lowerPrice)}`}
+        >
           <p className="text-[10px] text-slate-600">Lower</p>
-          <p className="mt-0.5 font-mono text-xs text-slate-400">
-            {formatPrice(position.lowerPrice)}
-          </p>
-        </div>
-        <div className="text-right">
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 font-mono text-xs text-slate-400 group-hover:text-slate-200">
+            <span className="truncate">{formatPrice(position.lowerPrice)}</span>
+            {copiedBoundary === "lower" ? (
+              <Check className="size-3.5 shrink-0 text-emerald-300" />
+            ) : (
+              <Copy className="size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+            )}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => copyBoundary("upper", position.upperPrice)}
+          className="group min-w-0 cursor-pointer rounded-lg p-2 text-right transition-colors hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          aria-label={`Copy upper price ${formatPrice(position.upperPrice)}`}
+        >
           <p className="text-[10px] text-slate-600">Upper</p>
-          <p className="mt-0.5 font-mono text-xs text-slate-400">
-            {formatPrice(position.upperPrice)}
-          </p>
-        </div>
+          <span className="mt-0.5 flex min-w-0 items-center justify-end gap-1.5 font-mono text-xs text-slate-400 group-hover:text-slate-200">
+            {copiedBoundary === "upper" ? (
+              <Check className="size-3.5 shrink-0 text-emerald-300" />
+            ) : (
+              <Copy className="size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+            )}
+            <span className="truncate">{formatPrice(position.upperPrice)}</span>
+          </span>
+        </button>
       </div>
     </div>
   );
