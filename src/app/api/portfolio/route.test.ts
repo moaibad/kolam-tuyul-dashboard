@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const service = vi.hoisted(() => ({
   getLivePortfolio: vi.fn(),
+  getDemoPortfolio: vi.fn(),
 }));
 
 vi.mock("@/server/portfolio-service", async () => {
@@ -14,13 +15,20 @@ vi.mock("@/server/portfolio-service", async () => {
     getLivePortfolio: service.getLivePortfolio,
   };
 });
+vi.mock("@/server/demo-portfolio", () => ({
+  getDemoPortfolio: service.getDemoPortfolio,
+}));
 vi.mock("server-only", () => ({}));
 
 import { GET } from "@/app/api/portfolio/route";
 import { InvalidWalletAddressError } from "@/server/portfolio-service";
 
 describe("GET /api/portfolio", () => {
-  beforeEach(() => service.getLivePortfolio.mockReset());
+  beforeEach(() => {
+    service.getLivePortfolio.mockReset();
+    service.getDemoPortfolio.mockReset();
+  });
+  afterEach(() => vi.unstubAllEnvs());
 
   it("returns a live portfolio without caching", async () => {
     service.getLivePortfolio.mockResolvedValue({
@@ -66,5 +74,26 @@ describe("GET /api/portfolio", () => {
 
     expect(response.status).toBe(502);
     consoleError.mockRestore();
+  });
+
+  it("only loads dummy data when demo mode is enabled", async () => {
+    vi.stubEnv("DEMO_MODE", "true");
+    service.getDemoPortfolio.mockResolvedValue({
+      address: "0x0000000000000000000000000000000000000001",
+      positions: [{ id: "demo-v4-123456" }],
+    });
+
+    const response = await GET(
+      new NextRequest(
+        "http://localhost/api/portfolio?address=0x0000000000000000000000000000000000000001",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(service.getDemoPortfolio).toHaveBeenCalledOnce();
+    expect(service.getLivePortfolio).not.toHaveBeenCalled();
+    expect(await response.json()).toMatchObject({
+      positions: [{ id: "demo-v4-123456" }],
+    });
   });
 });

@@ -4,13 +4,16 @@ import {
   getLivePortfolio,
   InvalidWalletAddressError,
 } from "@/server/portfolio-service";
+import { getDemoPortfolio } from "@/server/demo-portfolio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const portfolio = await getLivePortfolio(
+    const loadPortfolio =
+      process.env.DEMO_MODE === "true" ? getDemoPortfolio : getLivePortfolio;
+    const portfolio = await loadPortfolio(
       request.nextUrl.searchParams.get("address") ?? "",
     );
     return Response.json(portfolio, {

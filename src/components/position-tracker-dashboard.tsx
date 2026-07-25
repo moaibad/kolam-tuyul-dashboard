@@ -27,9 +27,16 @@ import type { PortfolioSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const AUTO_REFETCH_INTERVAL_MS = 60_000;
+const DEMO_WALLET_ADDRESS = "0x0000000000000000000000000000000000000001";
 
-export function PositionTrackerDashboard() {
-  const [address, setAddress] = useState("");
+export function PositionTrackerDashboard({
+  demoMode = false,
+}: {
+  demoMode?: boolean;
+}) {
+  const [address, setAddress] = useState(
+    demoMode ? DEMO_WALLET_ADDRESS : "",
+  );
   const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
   const [loadFailure, setLoadFailure] = useState<{
     address: string;
@@ -165,7 +172,7 @@ export function PositionTrackerDashboard() {
                   Position Tracker
                 </h1>
                 <Badge className="border-violet-400/15 bg-violet-400/8 text-[9px] font-semibold tracking-wider text-violet-200 uppercase">
-                  Live data
+                  {demoMode ? "Demo data" : "Live data"}
                 </Badge>
               </div>
               <p className="mt-1 hidden text-xs text-slate-600 sm:block">
