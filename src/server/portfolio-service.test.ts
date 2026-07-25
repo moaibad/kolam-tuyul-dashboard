@@ -98,6 +98,7 @@ describe("portfolio service", () => {
     expect(result.blockNumber).toBe("99");
     expect(result.positions[0].tokenId).toBe("42");
     expect(result.positions[0].liquidity).toBe("123");
+    expect(result.positions[0].quoteTokenPriceUsdg).toBeNull();
     expect(result.positions[0].amounts[0].raw).toBe("7");
     expect(result.positions[0].accountingError).toBe(
       "Historical RPC unavailable",

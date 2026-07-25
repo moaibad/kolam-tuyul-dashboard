@@ -113,6 +113,7 @@ function serializePosition(position: CorePositionSnapshot): PositionSnapshot {
     token0: position.token0,
     token1: position.token1,
     quoteToken: position.quoteToken,
+    quoteTokenPriceUsdg: position.quoteTokenPriceUsdg,
     feeLabel: position.feeLabel ?? formatFeeTier(position.feeTier),
     tickLower: position.tickLower,
     tickUpper: position.tickUpper,

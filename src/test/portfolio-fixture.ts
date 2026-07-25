@@ -28,6 +28,7 @@ function position(
     },
     token1: USDG,
     quoteToken: USDG,
+    quoteTokenPriceUsdg: 1,
     feeLabel: "0.30%",
     tickLower: -313_880,
     tickUpper: -308_280,

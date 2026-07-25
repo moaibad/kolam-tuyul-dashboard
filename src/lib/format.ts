@@ -30,6 +30,27 @@ export function formatSignedCurrency(value: number) {
   return `${sign}${formatCurrency(value)}`;
 }
 
+export function formatQuoteValue(
+  value: number,
+  symbol: string,
+  quoteTokenPriceUsdg: number | null,
+  signed = false,
+) {
+  const digits =
+    symbol.toUpperCase() === "USDG"
+      ? 2
+      : value !== 0 && Math.abs(value) < 0.01
+        ? 6
+        : 4;
+  const sign = signed && value > 0 ? "+" : "";
+  const primary = `${sign}${formatNumber(value, digits)} ${symbol}`;
+  if (symbol.toUpperCase() === "USDG") return primary;
+  if (quoteTokenPriceUsdg == null) return `${primary} (USDG unavailable)`;
+  const usdgValue = value * quoteTokenPriceUsdg;
+  const usdgSign = signed && usdgValue > 0 ? "+" : "";
+  return `${primary} (${usdgSign}${formatCurrency(usdgValue)})`;
+}
+
 export function formatPrice(value: number) {
   if (value === 0) return "0";
   if (Math.abs(value) >= 1) return formatNumber(value, 3);

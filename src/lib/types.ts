@@ -22,6 +22,7 @@ export interface PositionSnapshot {
   token0: TokenInfo;
   token1: TokenInfo;
   quoteToken: TokenInfo;
+  quoteTokenPriceUsdg: number | null;
   feeLabel: string;
   tickLower: number;
   tickUpper: number;

@@ -4,6 +4,7 @@ import {
   formatCurrency,
   formatPercent,
   formatPrice,
+  formatQuoteValue,
   getRangeProgress,
   isValidWalletAddress,
 } from "@/lib/format";
@@ -20,6 +21,19 @@ describe("format helpers", () => {
     expect(formatCurrency(1302.6)).toBe("$1,302.60");
     expect(formatPercent(13.026)).toBe("+13.03%");
     expect(formatPercent(-2.41)).toBe("-2.41%");
+  });
+
+  it("formats position values in quote token with their USDG equivalent", () => {
+    expect(formatQuoteValue(0.016, "ETH", 1_856.25)).toBe(
+      "0.0160 ETH ($29.70)",
+    );
+    expect(formatQuoteValue(0.004266, "ETH", 1_856.25, true)).toBe(
+      "+0.004266 ETH (+$7.92)",
+    );
+    expect(formatQuoteValue(20, "USDG", 1)).toBe("20.00 USDG");
+    expect(formatQuoteValue(0.016, "ETH", null)).toBe(
+      "0.0160 ETH (USDG unavailable)",
+    );
   });
 
   it("preserves significant digits for small prices", () => {

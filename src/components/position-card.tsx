@@ -20,7 +20,7 @@ import {
   formatCurrency,
   formatNumber,
   formatPercent,
-  formatSignedCurrency,
+  formatQuoteValue,
 } from "@/lib/format";
 import type { PositionSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -34,8 +34,19 @@ export function PositionCard({
 }) {
   const inRange = position.status === "in_range";
   const totalFees =
-    (position.claimedFeesValueQuote ?? 0) +
-    (position.unclaimedFeesValueQuote ?? 0);
+    position.claimedFeesValueQuote == null ||
+    position.unclaimedFeesValueQuote == null
+      ? null
+      : position.claimedFeesValueQuote + position.unclaimedFeesValueQuote;
+  const formatQuote = (value: number | null, signed = false) =>
+    value == null
+      ? "Unavailable"
+      : formatQuoteValue(
+          value,
+          position.quoteToken.symbol,
+          position.quoteTokenPriceUsdg,
+          signed,
+        );
 
   return (
     <Card className="min-w-0 max-w-full gap-0 overflow-hidden border-white/[0.06] bg-card/90 py-0 shadow-[0_20px_50px_rgba(0,0,0,.18)]">
@@ -91,26 +102,26 @@ export function PositionCard({
         <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-3">
           <Metric
             label="Deposit"
-            value={formatMaybeCurrency(position.depositedValueQuote)}
+            value={formatQuote(position.depositedValueQuote)}
           />
           <Metric
             label="Current value"
-            value={formatMaybeCurrency(position.activeLpValueQuote)}
+            value={formatQuote(position.activeLpValueQuote)}
           />
-          <Metric label="Total fees" value={formatCurrency(totalFees)} />
+          <Metric label="Total fees" value={formatQuote(totalFees)} />
           <Metric
             label="Claimed"
-            value={formatMaybeCurrency(position.claimedFeesValueQuote)}
+            value={formatQuote(position.claimedFeesValueQuote)}
             subdued
           />
           <Metric
             label="Unclaimed"
-            value={formatMaybeCurrency(position.unclaimedFeesValueQuote)}
+            value={formatQuote(position.unclaimedFeesValueQuote)}
             valueClassName="text-cyan-300"
           />
           <Metric
             label="Total result"
-            value={formatMaybeCurrency(position.totalResultValueQuote)}
+            value={formatQuote(position.totalResultValueQuote)}
           />
         </div>
 
@@ -137,7 +148,7 @@ export function PositionCard({
                   : "text-rose-300",
               )}
             >
-              {formatMaybeSignedCurrency(position.netLpResultQuote)}
+              {formatQuote(position.netLpResultQuote, true)}
             </p>
             <p className="mt-0.5 text-xs text-slate-500">
               {position.netLpResultPercent == null
@@ -294,12 +305,4 @@ function TokenComposition({ position }: { position: PositionSnapshot }) {
       </div>
     </div>
   );
-}
-
-function formatMaybeCurrency(value: number | null) {
-  return value == null ? "Unavailable" : formatCurrency(value);
-}
-
-function formatMaybeSignedCurrency(value: number | null) {
-  return value == null ? "Unavailable" : formatSignedCurrency(value);
 }
