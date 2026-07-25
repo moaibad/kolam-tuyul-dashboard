@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EmptyState } from "@/components/empty-state";
@@ -50,5 +51,26 @@ describe("dashboard states", () => {
     expect(screen.getByText("IN RANGE")).toBeInTheDocument();
     expect(screen.getByText("OUT OF RANGE")).toBeInTheDocument();
     expect(screen.getByText("Live data")).toBeInTheDocument();
+    expect(screen.getByText(/Last synced \d+s ago/)).toBeInTheDocument();
+  });
+
+  it("keeps positions visible and shows a global status while refreshing", async () => {
+    navigation.address =
+      "address=0x0000000000000000000000000000000000000001";
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider>
+        <PositionTrackerDashboard />
+      </TooltipProvider>,
+    );
+
+    await screen.findByText("Uniswap v4", {}, { timeout: 2_000 });
+    await user.click(screen.getByRole("button", { name: "Refresh portfolio" }));
+
+    expect(screen.getByText("Syncing all positions...")).toBeInTheDocument();
+    expect(screen.getByText("Uniswap v4")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Last synced \d+s ago/, {}, { timeout: 2_000 }),
+    ).toBeInTheDocument();
   });
 });

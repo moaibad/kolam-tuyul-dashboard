@@ -5,6 +5,7 @@ import {
   formatPercent,
   formatPrice,
   formatQuoteValue,
+  formatSyncAge,
   getRangeProgress,
   isValidWalletAddress,
 } from "@/lib/format";
@@ -39,6 +40,18 @@ describe("format helpers", () => {
   it("preserves significant digits for small prices", () => {
     expect(formatPrice(0.00000003142)).toBe("0.00000003142");
     expect(formatPrice(0)).toBe("0");
+  });
+
+  it.each([
+    [0, "0s ago"],
+    [59_999, "59s ago"],
+    [60_000, "1m ago"],
+    [59 * 60_000, "59m ago"],
+    [60 * 60_000, "1h ago"],
+    [23 * 60 * 60_000, "23h ago"],
+    [24 * 60 * 60_000, "1d ago"],
+  ])("formats a sync age of %i milliseconds", (elapsedMs, expected) => {
+    expect(formatSyncAge(1_000_000 + elapsedMs, 1_000_000)).toBe(expected);
   });
 });
 

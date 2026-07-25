@@ -75,6 +75,19 @@ export function formatAge(nowMs: number, timestampMs: number) {
   return `${totalMinutes}m`;
 }
 
+export function formatSyncAge(nowMs: number, timestampMs: number) {
+  const totalSeconds = Math.max(0, Math.floor((nowMs - timestampMs) / 1_000));
+  if (totalSeconds < 60) return `${totalSeconds}s ago`;
+
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes}m ago`;
+
+  const totalHours = Math.floor(totalMinutes / 60);
+  if (totalHours < 24) return `${totalHours}h ago`;
+
+  return `${Math.floor(totalHours / 24)}d ago`;
+}
+
 export function getRangeProgress(
   currentTick: number,
   tickLower: number,

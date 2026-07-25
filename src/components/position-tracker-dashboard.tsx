@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { DashboardLoading } from "@/components/dashboard-loading";
@@ -21,11 +21,14 @@ import { Button } from "@/components/ui/button";
 import { WalletSearch } from "@/components/wallet-search";
 import {
   formatCompactAddress,
+  formatSyncAge,
   isValidWalletAddress,
 } from "@/lib/format";
 import { httpPositionDataSource } from "@/lib/http-position-data-source";
 import type { PortfolioSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const AUTO_REFETCH_INTERVAL_MS = 60_000;
 
 export function PositionTrackerDashboard() {
   const router = useRouter();
@@ -34,51 +37,112 @@ export function PositionTrackerDashboard() {
   const queryAddress = searchParams.get("address")?.trim() ?? "";
   const address = isValidWalletAddress(queryAddress) ? queryAddress : "";
   const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
-  const [loadError, setLoadError] = useState("");
+  const [loadFailure, setLoadFailure] = useState<{
+    address: string;
+    message: string;
+  } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const activeAddressRef = useRef(address);
+  const latestRequestRef = useRef(0);
+  const inFlightRef = useRef<{
+    address: string;
+    requestId: number;
+    promise: Promise<void>;
+  } | null>(null);
 
   const loadPortfolio = useCallback(async (walletAddress: string) => {
-    try {
-      const result = await httpPositionDataSource.getPortfolio(walletAddress);
-      setPortfolio(result);
-      setLoadError("");
-    } catch (error) {
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Live portfolio could not be loaded. Please try again.",
-      );
+    const normalizedAddress = walletAddress.toLowerCase();
+    const currentRequest = inFlightRef.current;
+    if (currentRequest?.address === normalizedAddress) {
+      return currentRequest.promise;
     }
-  }, []);
 
-  useEffect(() => {
-    if (!address) return;
-    let active = true;
-    httpPositionDataSource
-      .getPortfolio(address)
+    const requestId = ++latestRequestRef.current;
+    setIsRefreshing(true);
+
+    const promise = httpPositionDataSource
+      .getPortfolio(walletAddress)
       .then((result) => {
-        if (active) {
+        if (
+          activeAddressRef.current.toLowerCase() === normalizedAddress &&
+          latestRequestRef.current === requestId
+        ) {
           setPortfolio(result);
-          setLoadError("");
+          setLoadFailure(null);
+          setNowMs(Date.now());
         }
       })
       .catch((error) => {
-        if (active) {
-          setLoadError(
-            error instanceof Error
-              ? error.message
-              : "Live portfolio could not be loaded. Please try again.",
-          );
+        if (
+          activeAddressRef.current.toLowerCase() === normalizedAddress &&
+          latestRequestRef.current === requestId
+        ) {
+          setLoadFailure({
+            address: normalizedAddress,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Live portfolio could not be loaded. Please try again.",
+          });
+        }
+      })
+      .finally(() => {
+        if (inFlightRef.current?.requestId === requestId) {
+          inFlightRef.current = null;
+        }
+        if (
+          activeAddressRef.current.toLowerCase() === normalizedAddress &&
+          latestRequestRef.current === requestId
+        ) {
+          setIsRefreshing(false);
         }
       });
-    return () => {
-      active = false;
+
+    inFlightRef.current = { address: normalizedAddress, requestId, promise };
+    return promise;
+  }, []);
+
+  useEffect(() => {
+    activeAddressRef.current = address;
+    if (!address) {
+      latestRequestRef.current += 1;
+      return;
+    }
+    void loadPortfolio(address);
+  }, [address, loadPortfolio]);
+
+  useEffect(() => {
+    if (!address) return;
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void loadPortfolio(address);
+      }
     };
-  }, [address]);
+    const interval = window.setInterval(
+      refreshWhenVisible,
+      AUTO_REFETCH_INTERVAL_MS,
+    );
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [address, loadPortfolio]);
 
   const displayedPortfolio =
     portfolio?.address.toLowerCase() === address.toLowerCase() ? portfolio : null;
+  const loadError =
+    loadFailure?.address === address.toLowerCase() ? loadFailure.message : "";
   const isLoading = Boolean(address && !displayedPortfolio && !loadError);
+
+  useEffect(() => {
+    if (!displayedPortfolio) return;
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [displayedPortfolio]);
 
   const formattedUpdate = useMemo(() => {
     if (!displayedPortfolio) return "";
@@ -94,15 +158,12 @@ export function PositionTrackerDashboard() {
   function search(walletAddress: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("address", walletAddress);
-    setLoadError("");
     router.push(`${pathname}?${params.toString()}`);
   }
 
   async function refresh() {
     if (!address || isRefreshing) return;
-    setIsRefreshing(true);
     await loadPortfolio(address);
-    setIsRefreshing(false);
   }
 
   return (
@@ -235,7 +296,7 @@ export function PositionTrackerDashboard() {
                 )}
                 <PortfolioSummary portfolio={displayedPortfolio} />
                 <section aria-labelledby="positions-title">
-                  <div className="mb-4 flex items-center justify-between">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h2
                         id="positions-title"
@@ -247,9 +308,32 @@ export function PositionTrackerDashboard() {
                         Uniswap v3 and v4 positions in this wallet
                       </p>
                     </div>
-                    <span className="rounded-full border border-white/[0.06] bg-white/[0.025] px-3 py-1 text-xs text-slate-500">
-                      {displayedPortfolio.positions.length} positions
-                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <span
+                        role="status"
+                        aria-live="polite"
+                        className="flex items-center gap-1.5 text-[11px] text-slate-500"
+                      >
+                        {isRefreshing ? (
+                          <>
+                            <RefreshCw className="size-3.5 animate-spin text-violet-300" />
+                            Syncing all positions...
+                          </>
+                        ) : (
+                          <>
+                            <Activity className="size-3.5 text-emerald-400" />
+                            Last synced{" "}
+                            {formatSyncAge(
+                              nowMs,
+                              displayedPortfolio.updatedAtMs,
+                            )}
+                          </>
+                        )}
+                      </span>
+                      <span className="rounded-full border border-white/[0.06] bg-white/[0.025] px-3 py-1 text-xs text-slate-500">
+                        {displayedPortfolio.positions.length} positions
+                      </span>
+                    </div>
                   </div>
                   {displayedPortfolio.positions.length === 0 ? (
                     <div className="rounded-2xl border border-white/[0.055] bg-white/[0.018] p-8 text-center">
