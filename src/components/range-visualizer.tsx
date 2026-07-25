@@ -32,7 +32,7 @@ export function RangeVisualizer({
     value: number,
   ) {
     try {
-      await navigator.clipboard.writeText(value.toFixed(8));
+      await navigator.clipboard.writeText(toPlainDecimal(value));
       setCopiedBoundary(boundary);
       window.setTimeout(() => {
         setCopiedBoundary((current) =>
@@ -142,4 +142,28 @@ export function RangeVisualizer({
       </div>
     </div>
   );
+}
+
+function toPlainDecimal(value: number) {
+  const raw = String(value);
+  if (!/[eE]/.test(raw)) return raw;
+
+  const [coefficient, exponentText] = raw.toLowerCase().split("e");
+  const exponent = Number(exponentText);
+  const negative = coefficient.startsWith("-");
+  const unsigned = negative ? coefficient.slice(1) : coefficient;
+  const [integer, fraction = ""] = unsigned.split(".");
+  const digits = integer + fraction;
+  const decimalIndex = integer.length + exponent;
+
+  let expanded: string;
+  if (decimalIndex <= 0) {
+    expanded = `0.${"0".repeat(-decimalIndex)}${digits}`;
+  } else if (decimalIndex >= digits.length) {
+    expanded = `${digits}${"0".repeat(decimalIndex - digits.length)}`;
+  } else {
+    expanded = `${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
+  }
+
+  return negative ? `-${expanded}` : expanded;
 }
