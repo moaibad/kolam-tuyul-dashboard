@@ -1,7 +1,7 @@
 "use client";
 
-import { Search, Wallet } from "lucide-react";
-import { useState } from "react";
+import { Search, Wallet, X } from "lucide-react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,15 @@ import { isValidWalletAddress } from "@/lib/format";
 export function WalletSearch({
   onSearch,
   isLoading = false,
+  initialValue = "",
 }: {
   onSearch: (address: string) => void;
   isLoading?: boolean;
+  initialValue?: string;
 }) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue);
   const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,6 +37,7 @@ export function WalletSearch({
         <div className="relative min-w-0 flex-1">
           <Wallet className="absolute top-1/2 left-4 size-4 -translate-y-1/2 text-slate-500" />
           <Input
+            ref={inputRef}
             aria-label="Wallet address"
             aria-invalid={Boolean(error)}
             aria-describedby={error ? "wallet-address-error" : "wallet-address-hint"}
@@ -47,8 +51,22 @@ export function WalletSearch({
             autoCapitalize="none"
             spellCheck={false}
             maxLength={128}
-            className="h-12 border-white/8 bg-[#171426]/80 pr-4 pl-11 font-mono text-sm text-slate-100 placeholder:text-slate-600 focus-visible:border-violet-400/50 focus-visible:ring-violet-400/15"
+            className="h-12 border-white/8 bg-[#171426]/80 pr-11 pl-11 font-mono text-sm text-slate-100 placeholder:text-slate-600 focus-visible:border-violet-400/50 focus-visible:ring-violet-400/15"
           />
+          {value && (
+            <button
+              type="button"
+              aria-label="Clear wallet address"
+              onClick={() => {
+                setValue("");
+                setError("");
+                inputRef.current?.focus();
+              }}
+              className="absolute top-1/2 right-3 grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-slate-500 transition-colors hover:bg-white/[0.05] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
           <span id="wallet-address-hint" className="sr-only">
             A public address beginning with 0x followed by 40 hexadecimal characters.
           </span>

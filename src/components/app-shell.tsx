@@ -1,14 +1,21 @@
 import Link from "next/link";
 
 import { SidebarContent } from "@/components/sidebar-content";
+import { buildWalletHref } from "@/lib/wallet-url";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  walletAddress = "",
+}: {
+  children: React.ReactNode;
+  walletAddress?: string;
+}) {
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-background">
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-sidebar/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1800px] items-center justify-between gap-4 px-5 sm:px-7 xl:px-10">
           <Link
-            href="/"
+            href={buildWalletHref("/", walletAddress)}
             aria-label="KolamTuyul home"
             className="flex shrink-0 items-center gap-2.5 text-[#eeeaf6] transition-colors hover:text-white"
           >
@@ -32,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          <SidebarContent />
+          <SidebarContent walletAddress={walletAddress} />
         </div>
       </header>
 

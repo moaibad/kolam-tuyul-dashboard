@@ -6,12 +6,21 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EmptyState } from "@/components/empty-state";
 import { PositionTrackerDashboard } from "@/components/position-tracker-dashboard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { httpPositionDataSource } from "@/lib/http-position-data-source";
+
+const navigation = vi.hoisted(() => ({
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => navigation,
+}));
 
 vi.mock("@/lib/http-position-data-source", async () => {
   const { fixturePositionDataSource } = await import(
@@ -21,6 +30,10 @@ vi.mock("@/lib/http-position-data-source", async () => {
 });
 
 describe("dashboard states", () => {
+  beforeEach(() => {
+    navigation.replace.mockReset();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -65,6 +78,73 @@ describe("dashboard states", () => {
       "0x0000000000000000000000000000000000000001",
       expect.objectContaining({ refresh: true }),
     );
+    expect(navigation.replace).toHaveBeenCalledWith(
+      "/?address=0x0000000000000000000000000000000000000001",
+      { scroll: false },
+    );
+  });
+
+  it("prefills and automatically loads a valid initial address", async () => {
+    const getPortfolio = vi.spyOn(httpPositionDataSource, "getPortfolio");
+
+    render(
+      <TooltipProvider>
+        <PositionTrackerDashboard initialAddress="0x0000000000000000000000000000000000000001" />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByLabelText("Wallet address")).toHaveValue(
+      "0x0000000000000000000000000000000000000001",
+    );
+    expect(
+      await screen.findByText(/Live · Updated \d+s ago/, {}, { timeout: 2_000 }),
+    ).toBeInTheDocument();
+    expect(getPortfolio).toHaveBeenCalledTimes(2);
+    expect(getPortfolio).toHaveBeenNthCalledWith(
+      1,
+      "0x0000000000000000000000000000000000000001",
+      expect.objectContaining({ refresh: false }),
+    );
+    expect(getPortfolio).toHaveBeenNthCalledWith(
+      2,
+      "0x0000000000000000000000000000000000000001",
+      expect.objectContaining({ refresh: true }),
+    );
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it("clears only the input while keeping the active snapshot", async () => {
+    vi.useFakeTimers();
+    const getPortfolio = vi.spyOn(httpPositionDataSource, "getPortfolio");
+
+    try {
+      render(
+        <TooltipProvider>
+          <PositionTrackerDashboard initialAddress="0x0000000000000000000000000000000000000001" />
+        </TooltipProvider>,
+      );
+      await act(() => vi.advanceTimersByTimeAsync(900));
+
+      const input = screen.getByLabelText("Wallet address");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Clear wallet address" }),
+      );
+
+      expect(input).toHaveValue("");
+      expect(input).toHaveFocus();
+      expect(screen.getByText("Uniswap v4")).toBeInTheDocument();
+      expect(navigation.replace).not.toHaveBeenCalled();
+
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      expect(getPortfolio).toHaveBeenCalledTimes(3);
+      expect(getPortfolio).toHaveBeenLastCalledWith(
+        "0x0000000000000000000000000000000000000001",
+        expect.objectContaining({ refresh: true }),
+      );
+    } finally {
+      getPortfolio.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("keeps positions visible and shows a global status while refreshing", async () => {

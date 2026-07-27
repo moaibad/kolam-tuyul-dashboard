@@ -6,6 +6,7 @@ import {
   Database,
   RefreshCw,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -29,6 +30,7 @@ import {
 } from "@/lib/realtime-refresh";
 import type { PortfolioSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { buildWalletHref } from "@/lib/wallet-url";
 
 const DEMO_WALLET_ADDRESS = "0x0000000000000000000000000000000000000001";
 type RefreshPhase = "idle" | "initial" | "background" | "manual";
@@ -36,11 +38,14 @@ type RefreshKind = Exclude<RefreshPhase, "idle">;
 
 export function PositionTrackerDashboard({
   demoMode = false,
+  initialAddress = "",
 }: {
   demoMode?: boolean;
+  initialAddress?: string;
 }) {
+  const router = useRouter();
   const [address, setAddress] = useState(
-    demoMode ? DEMO_WALLET_ADDRESS : "",
+    demoMode ? DEMO_WALLET_ADDRESS : initialAddress,
   );
   const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
   const [loadFailure, setLoadFailure] = useState<{
@@ -331,6 +336,7 @@ export function PositionTrackerDashboard({
   }, [displayedPortfolio]);
 
   function search(walletAddress: string) {
+    router.replace(buildWalletHref("/", walletAddress), { scroll: false });
     if (walletAddress.toLowerCase() === address.toLowerCase()) {
       void refresh();
       return;
@@ -356,7 +362,7 @@ export function PositionTrackerDashboard({
   }
 
   return (
-    <AppShell>
+    <AppShell walletAddress={address}>
       <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden">
         <DashboardPageHeader
           title="Position Tracker"
@@ -394,7 +400,11 @@ export function PositionTrackerDashboard({
                 </p>
               </div>
               <div className="min-w-0 w-full max-w-full xl:max-w-2xl">
-                <WalletSearch onSearch={search} isLoading={isLoading} />
+                <WalletSearch
+                  onSearch={search}
+                  isLoading={isLoading}
+                  initialValue={initialAddress}
+                />
               </div>
             </div>
           </section>

@@ -9,7 +9,8 @@ import {
   CalendarDays,
   RefreshCw,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { WalletSearch } from "@/components/wallet-search";
@@ -23,6 +24,7 @@ import {
 import { portfolioCalendarMock } from "@/lib/portfolio-calendar-mock";
 import { formatCurrency, formatNumber, formatSignedCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { buildWalletHref } from "@/lib/wallet-url";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
@@ -40,26 +42,28 @@ const DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
 
 export function PortfolioPnlCalendar({
   demoMode = false,
+  initialAddress = "",
 }: {
   demoMode?: boolean;
+  initialAddress?: string;
 }) {
-  const currentMonth = getBangkokMonth();
-  const [address, setAddress] = useState("");
-  const [displayedAddress, setDisplayedAddress] = useState("");
+  const router = useRouter();
+  const [address, setAddress] = useState(initialAddress);
   const [months, setMonths] = useState<PortfolioCalendarMonth[]>(
     demoMode ? portfolioCalendarMock : [],
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
-  const activeAddressRef = useRef("");
+  const activeAddressRef = useRef(initialAddress.toLowerCase());
+  const displayedAddressRef = useRef("");
   const latestRequestRef = useRef(0);
   const inFlightRef = useRef<{
     address: string;
     promise: Promise<void>;
   } | null>(null);
 
-  function load(walletAddress: string) {
+  const load = useCallback((walletAddress: string) => {
     const normalizedAddress = walletAddress.toLowerCase();
     if (inFlightRef.current?.address === normalizedAddress) {
       return inFlightRef.current.promise;
@@ -72,11 +76,11 @@ export function PortfolioPnlCalendar({
     setError("");
     setProgress("Loading closed positions from Krystal…");
     if (
-      displayedAddress &&
-      displayedAddress.toLowerCase() !== normalizedAddress
+      displayedAddressRef.current &&
+      displayedAddressRef.current.toLowerCase() !== normalizedAddress
     ) {
       setMonths([]);
-      setDisplayedAddress("");
+      displayedAddressRef.current = "";
     }
 
     const isCurrentRequest = () =>
@@ -87,11 +91,11 @@ export function PortfolioPnlCalendar({
       try {
         const response = await httpPortfolioCalendarDataSource.get(
           walletAddress,
-          currentMonth,
+          getBangkokMonth(),
         );
         if (!isCurrentRequest()) return;
         setMonths(response.months);
-        setDisplayedAddress(walletAddress);
+        displayedAddressRef.current = walletAddress;
         setProgress(
           `Showing closed positions since ${response.windowStart} · Data by Krystal`,
         );
@@ -115,6 +119,19 @@ export function PortfolioPnlCalendar({
 
     inFlightRef.current = { address: normalizedAddress, promise };
     return promise;
+  }, []);
+
+  useEffect(() => {
+    if (!demoMode && initialAddress) {
+      void load(initialAddress);
+    }
+  }, [demoMode, initialAddress, load]);
+
+  function search(walletAddress: string) {
+    router.replace(buildWalletHref("/portfolio-calendar", walletAddress), {
+      scroll: false,
+    });
+    return load(walletAddress);
   }
 
   if (demoMode) {
@@ -143,7 +160,11 @@ export function PortfolioPnlCalendar({
             </p>
           </div>
           <div className="min-w-0 w-full max-w-full xl:max-w-2xl">
-            <WalletSearch onSearch={load} isLoading={isLoading} />
+            <WalletSearch
+              onSearch={search}
+              isLoading={isLoading}
+              initialValue={initialAddress}
+            />
           </div>
         </div>
       </section>

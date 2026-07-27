@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
+import { buildWalletHref } from "@/lib/wallet-url";
 
 const navigation = [
   {
@@ -19,7 +20,11 @@ const navigation = [
   },
 ];
 
-export function SidebarContent() {
+export function SidebarContent({
+  walletAddress = "",
+}: {
+  walletAddress?: string;
+}) {
   const pathname = usePathname();
 
   return (
@@ -30,7 +35,7 @@ export function SidebarContent() {
         return (
           <Link
             key={item.href}
-            href={item.href}
+            href={buildWalletHref(item.href, walletAddress)}
             aria-label={item.label}
             aria-current={active ? "page" : undefined}
             className={cn(

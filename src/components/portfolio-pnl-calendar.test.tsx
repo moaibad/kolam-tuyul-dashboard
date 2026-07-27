@@ -5,6 +5,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const dataSource = vi.hoisted(() => ({
   get: vi.fn(),
 }));
+const navigation = vi.hoisted(() => ({
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => navigation,
+}));
 
 vi.mock("@/lib/http-portfolio-calendar-data-source", () => ({
   httpPortfolioCalendarDataSource: dataSource,
@@ -61,6 +68,7 @@ async function submitWallet(user: ReturnType<typeof userEvent.setup>) {
 describe("PortfolioPnlCalendar Krystal loading", () => {
   beforeEach(() => {
     dataSource.get.mockReset();
+    navigation.replace.mockReset();
   });
 
   it("renders closed positions from the rolling Krystal window", async () => {
@@ -78,6 +86,22 @@ describe("PortfolioPnlCalendar Krystal loading", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Position closure/)).toBeInTheDocument();
     expect(dataSource.get).toHaveBeenCalledOnce();
+    expect(navigation.replace).toHaveBeenCalledWith(
+      "/portfolio-calendar?address=0x0000000000000000000000000000000000000001",
+      { scroll: false },
+    );
+  });
+
+  it("prefills and automatically loads a valid initial address", async () => {
+    dataSource.get.mockResolvedValue(calendar());
+
+    render(<PortfolioPnlCalendar initialAddress={ADDRESS} />);
+
+    expect(screen.getByLabelText("Wallet address")).toHaveValue(ADDRESS);
+    expect(await screen.findByText("WETH / USDC")).toBeInTheDocument();
+    expect(dataSource.get).toHaveBeenCalledOnce();
+    expect(dataSource.get).toHaveBeenCalledWith(ADDRESS, expect.any(String));
+    expect(navigation.replace).not.toHaveBeenCalled();
   });
 
   it("shows an upstream error and allows retry", async () => {
