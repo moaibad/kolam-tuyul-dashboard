@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -11,6 +11,8 @@ import {
 const ADDRESS = "0x0000000000000000000000000000000000000001";
 
 describe("Krystal API adapter", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it("maps a Robinhood v3 position and derives stable USD metrics", () => {
     const portfolio = mapKrystalPortfolio(
       ADDRESS,
@@ -130,6 +132,62 @@ describe("Krystal API adapter", () => {
 
     expect(String(fetcher.mock.calls[0]![0])).toContain("refreshAll=false");
     expect(String(fetcher.mock.calls[1]![0])).toContain("refreshAll=true");
+  });
+
+  it("uses a configured positions proxy and preserves request parameters", async () => {
+    vi.stubEnv(
+      "KRYSTAL_POSITIONS_URL",
+      "https://krystal-proxy.example.workers.dev/user-positions",
+    );
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      void input;
+      return Response.json({
+        statsByChain: { "4663": { openPositionCount: 0 } },
+        positions: [],
+      });
+    });
+
+    await fetchKrystalPositions({
+      walletAddress: ADDRESS,
+      status: "open",
+      refresh: true,
+      fetcher,
+    });
+
+    const requestedUrl = new URL(String(fetcher.mock.calls[0]![0]));
+    expect(requestedUrl.origin).toBe(
+      "https://krystal-proxy.example.workers.dev",
+    );
+    expect(requestedUrl.pathname).toBe("/user-positions");
+    expect(requestedUrl.searchParams.get("addresses")).toBe(ADDRESS);
+    expect(requestedUrl.searchParams.get("walletAddress")).toBe(ADDRESS);
+    expect(requestedUrl.searchParams.get("chainIds")).toBe("4663");
+    expect(requestedUrl.searchParams.get("positionStatus")).toBe("open");
+    expect(requestedUrl.searchParams.get("orderBy")).toBe("liquidity");
+    expect(requestedUrl.searchParams.get("refreshAll")).toBe("true");
+  });
+
+  it("uses the direct Krystal endpoint when no proxy is configured", async () => {
+    vi.stubEnv("KRYSTAL_POSITIONS_URL", "");
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      void input;
+      return Response.json({
+        statsByChain: { "4663": { closedPositionCount: 0 } },
+        positions: [],
+      });
+    });
+
+    await fetchKrystalPositions({
+      walletAddress: ADDRESS,
+      status: "closed",
+      fetcher,
+    });
+
+    const requestedUrl = new URL(String(fetcher.mock.calls[0]![0]));
+    expect(requestedUrl.origin).toBe("https://api.krystal.app");
+    expect(requestedUrl.pathname).toBe("/all/v2/lp/userPositions");
+    expect(requestedUrl.searchParams.get("positionStatus")).toBe("closed");
+    expect(requestedUrl.searchParams.get("orderBy")).toBe("lastAction");
   });
 
   it("paginates, deduplicates, and filters unsupported protocols", async () => {

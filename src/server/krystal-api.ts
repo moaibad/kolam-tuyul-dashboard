@@ -8,7 +8,7 @@ import type {
   TokenInfo,
 } from "@/lib/types";
 
-const KRYSTAL_POSITIONS_URL =
+const DEFAULT_KRYSTAL_POSITIONS_URL =
   "https://api.krystal.app/all/v2/lp/userPositions";
 const ROBINHOOD_CHAIN_ID = 4663;
 const PAGE_SIZE = 500;
@@ -33,6 +33,13 @@ export class KrystalApiError extends Error {
   }
 }
 
+function krystalPositionsUrl(): string {
+  return (
+    process.env.KRYSTAL_POSITIONS_URL?.trim() ||
+    DEFAULT_KRYSTAL_POSITIONS_URL
+  );
+}
+
 export async function fetchKrystalPositions(input: {
   walletAddress: string;
   status: KrystalPositionStatus;
@@ -45,7 +52,7 @@ export async function fetchKrystalPositions(input: {
   let stats: Record<string, unknown> | null = null;
 
   for (let offset = 0; ; offset += PAGE_SIZE) {
-    const url = new URL(KRYSTAL_POSITIONS_URL);
+    const url = new URL(krystalPositionsUrl());
     url.searchParams.set("addresses", input.walletAddress);
     url.searchParams.set("walletAddress", input.walletAddress);
     url.searchParams.set("chainIds", String(ROBINHOOD_CHAIN_ID));
