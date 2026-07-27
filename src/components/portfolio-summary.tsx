@@ -1,7 +1,5 @@
 import {
   Activity,
-  ChevronDown,
-  CircleDollarSign,
   Layers3,
   TrendingUp,
 } from "lucide-react";
@@ -46,7 +44,7 @@ export function PortfolioSummary({
           outOfRange > 0 ? "bg-amber-300" : "bg-emerald-300",
         )}
       />
-      <div className="grid lg:grid-cols-[1.15fr_1fr_1fr]">
+      <div className="grid lg:grid-cols-[1.3fr_1fr_1fr_1fr]">
         <div className="p-5 pt-7 sm:p-7 sm:pt-8">
           <p
             id="portfolio-health-title"
@@ -57,10 +55,48 @@ export function PortfolioSummary({
           <p className="mt-2 truncate text-4xl font-semibold tracking-[-0.03em] text-slate-50 sm:text-5xl">
             {formatMaybeCurrency(portfolio.totals.currentLpValueUsdg)}
           </p>
+          <dl
+            aria-label="Portfolio value details"
+            className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs"
+          >
+            <InlineDetail
+              label="Deposited"
+              value={formatMaybeCurrency(portfolio.totals.depositedUsdg)}
+            />
+            <InlineDetail
+              label="Current liquidity"
+              value={formatMaybeCurrency(
+                portfolio.totals.currentLiquidityUsdg ??
+                  portfolio.totals.currentLpValueUsdg,
+              )}
+            />
+          </dl>
           <p className="mt-2 text-xs text-slate-500">
             Across {portfolio.positions.length} open{" "}
             {portfolio.positions.length === 1 ? "position" : "positions"}
           </p>
+        </div>
+        <div className="border-t border-white/[0.06] p-5 sm:p-7 lg:border-t-0 lg:border-l">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+            <Layers3 className="size-4" />
+            Fees
+          </div>
+          <p className="mt-2 truncate text-2xl font-semibold tracking-tight text-cyan-300">
+            {formatMaybeCurrency(totalFees)}
+          </p>
+          <dl
+            aria-label="Fee details"
+            className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs"
+          >
+            <InlineDetail
+              label="Claimed"
+              value={formatMaybeCurrency(portfolio.totals.claimedFeesUsdg)}
+            />
+            <InlineDetail
+              label="Unclaimed"
+              value={formatMaybeCurrency(portfolio.totals.unclaimedFeesUsdg)}
+            />
+          </dl>
         </div>
         <div className="border-t border-white/[0.06] p-5 sm:p-7 lg:border-t-0 lg:border-l">
           <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
@@ -100,63 +136,21 @@ export function PortfolioSummary({
           </p>
         </div>
       </div>
-      <details className="group border-t border-white/[0.06]">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-xs font-medium text-slate-400 transition-colors hover:bg-white/[0.025] hover:text-slate-200 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-violet-400 sm:px-6">
-          Accounting details
-          <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
-        </summary>
-        <div className="grid gap-x-8 gap-y-5 border-t border-white/[0.05] px-5 py-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
-          <DetailMetric
-            icon={CircleDollarSign}
-            label="Deposited benchmark"
-            value={formatMaybeCurrency(portfolio.totals.depositedUsdg)}
-          />
-          <DetailMetric
-            icon={CircleDollarSign}
-            label="Current liquidity"
-            value={formatMaybeCurrency(
-              portfolio.totals.currentLiquidityUsdg ??
-                portfolio.totals.currentLpValueUsdg,
-            )}
-          />
-          <DetailMetric
-            icon={Layers3}
-            label="Total fees"
-            value={formatMaybeCurrency(totalFees)}
-            note={`${formatMaybeCurrency(portfolio.totals.unclaimedFeesUsdg)} unclaimed`}
-          />
-          <DetailMetric
-            icon={Activity}
-            label="Position value"
-            value={formatMaybeCurrency(portfolio.totals.totalResultUsdg)}
-          />
-        </div>
-      </details>
     </section>
   );
 }
 
-function DetailMetric({
-  icon: Icon,
+function InlineDetail({
   label,
   value,
-  note,
 }: {
-  icon: typeof Activity;
   label: string;
   value: string;
-  note?: string;
 }) {
   return (
-    <div className="min-w-0">
-      <div className="flex items-center gap-2 text-xs text-slate-500">
-        <Icon className="size-3.5" />
-        {label}
-      </div>
-      <p className="mt-1.5 truncate text-sm font-medium text-slate-200">
-        {value}
-      </p>
-      {note && <p className="mt-1 text-xs text-slate-600">{note}</p>}
+    <div className="flex min-w-0 items-baseline gap-1.5">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="truncate font-medium text-slate-300">{value}</dd>
     </div>
   );
 }
