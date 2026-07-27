@@ -3,7 +3,7 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-import { formatPrice, getRangeProgress } from "@/lib/format";
+import { formatPrice, getPriceRangeProgress } from "@/lib/format";
 import type { PositionSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +12,10 @@ export function RangeVisualizer({
 }: {
   position: PositionSnapshot;
 }) {
-  const progress = getRangeProgress(
-    position.currentTick,
-    position.tickLower,
-    position.tickUpper,
+  const progress = getPriceRangeProgress(
+    position.currentPrice,
+    position.lowerPrice,
+    position.upperPrice,
   );
   const isInside = progress.placement === "inside";
   const [copiedBoundary, setCopiedBoundary] = useState<
@@ -59,17 +59,13 @@ export function RangeVisualizer({
           <p className="mt-1 text-xl font-semibold text-slate-50">
             {formatPrice(position.currentPrice)}{" "}
             <span className="text-xs font-medium text-slate-500">
-              {position.quoteToken.symbol}
+              {position.token1.symbol} / {position.token0.symbol}
             </span>
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs font-medium text-slate-500">
-            Tick
-          </p>
-          <p className="mt-1 font-mono text-xs text-slate-400">
-            {position.currentTick.toLocaleString("en-US")}
-          </p>
+          <p className="text-xs font-medium text-slate-500">Source</p>
+          <p className="mt-1 text-xs text-slate-400">Krystal</p>
         </div>
       </div>
 

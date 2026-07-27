@@ -44,6 +44,28 @@ describe("GET /api/portfolio", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(await response.json()).toMatchObject({ positions: [] });
+    expect(service.getLivePortfolio).toHaveBeenCalledWith(
+      "0x0000000000000000000000000000000000000001",
+      false,
+    );
+  });
+
+  it("requests a fresh Krystal snapshot when refresh=1", async () => {
+    service.getLivePortfolio.mockResolvedValue({
+      address: "0x0000000000000000000000000000000000000001",
+      positions: [],
+    });
+
+    await GET(
+      new NextRequest(
+        "http://localhost/api/portfolio?address=0x0000000000000000000000000000000000000001&refresh=1",
+      ),
+    );
+
+    expect(service.getLivePortfolio).toHaveBeenCalledWith(
+      "0x0000000000000000000000000000000000000001",
+      true,
+    );
   });
 
   it("returns 400 for an invalid wallet address", async () => {
@@ -64,7 +86,7 @@ describe("GET /api/portfolio", () => {
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
     service.getLivePortfolio.mockImplementationOnce(() => {
-      throw new Error("RPC unavailable");
+      throw new Error("Krystal unavailable");
     });
     const response = await GET(
       new NextRequest(

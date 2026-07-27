@@ -113,8 +113,11 @@ export function PortfolioSummary({
           />
           <DetailMetric
             icon={CircleDollarSign}
-            label="Current LP value"
-            value={formatMaybeCurrency(portfolio.totals.currentLpValueUsdg)}
+            label="Current liquidity"
+            value={formatMaybeCurrency(
+              portfolio.totals.currentLiquidityUsdg ??
+                portfolio.totals.currentLpValueUsdg,
+            )}
           />
           <DetailMetric
             icon={Layers3}
@@ -124,7 +127,7 @@ export function PortfolioSummary({
           />
           <DetailMetric
             icon={Activity}
-            label="LP value + fees"
+            label="Position value"
             value={formatMaybeCurrency(portfolio.totals.totalResultUsdg)}
           />
         </div>

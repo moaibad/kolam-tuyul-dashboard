@@ -103,3 +103,23 @@ export function getRangeProgress(
     percent: Math.max(0, Math.min(100, percent)),
   };
 }
+
+export function getPriceRangeProgress(
+  currentPrice: number,
+  lowerPrice: number,
+  upperPrice: number,
+) {
+  if (currentPrice < lowerPrice) {
+    return { placement: "below" as const, percent: 0 };
+  }
+  if (currentPrice > upperPrice) {
+    return { placement: "above" as const, percent: 100 };
+  }
+  const span = upperPrice - lowerPrice;
+  const percent =
+    span > 0 ? ((currentPrice - lowerPrice) / span) * 100 : 50;
+  return {
+    placement: "inside" as const,
+    percent: Math.max(0, Math.min(100, percent)),
+  };
+}

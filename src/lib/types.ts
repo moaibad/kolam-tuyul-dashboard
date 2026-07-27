@@ -24,9 +24,9 @@ export interface PositionSnapshot {
   quoteToken: TokenInfo;
   quoteTokenPriceUsdg: number | null;
   feeLabel: string;
-  tickLower: number;
-  tickUpper: number;
-  currentTick: number;
+  tickLower?: number;
+  tickUpper?: number;
+  currentTick?: number;
   currentPrice: number;
   lowerPrice: number;
   upperPrice: number;
@@ -34,7 +34,7 @@ export interface PositionSnapshot {
   status: RangeStatus;
   outOfRangeSinceMs?: number;
   mintTimestampMs: number;
-  blockNumber: string;
+  blockNumber?: string;
   amounts: TokenAmount[];
   depositedValueQuote: number | null;
   activeLpValueQuote: number | null;
@@ -43,6 +43,10 @@ export interface PositionSnapshot {
   totalResultValueQuote: number | null;
   netLpResultQuote: number | null;
   netLpResultPercent: number | null;
+  impermanentLossUsdg?: number | null;
+  compareToHodlUsdg?: number | null;
+  apr?: number | null;
+  withdrawnUsdg?: number | null;
   accountingStatus: AccountingStatus;
   accountingError?: string;
   uniswapUrl: string;
@@ -52,12 +56,14 @@ export interface PositionSnapshot {
 export interface PortfolioSnapshot {
   address: string;
   chainName: string;
-  blockNumber: string;
+  blockNumber?: string;
   updatedAtMs: number;
+  dataSource?: "krystal" | "demo";
   positions: PositionSnapshot[];
   totals: {
     depositedUsdg: number | null;
     currentLpValueUsdg: number | null;
+    currentLiquidityUsdg?: number | null;
     claimedFeesUsdg: number | null;
     unclaimedFeesUsdg: number | null;
     totalResultUsdg: number | null;
@@ -69,5 +75,8 @@ export interface PortfolioSnapshot {
 }
 
 export interface PositionDataSource {
-  getPortfolio(address: string): Promise<PortfolioSnapshot>;
+  getPortfolio(
+    address: string,
+    options?: { refresh?: boolean },
+  ): Promise<PortfolioSnapshot>;
 }

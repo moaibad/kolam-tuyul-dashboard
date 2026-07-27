@@ -15,17 +15,6 @@ export const httpPortfolioCalendarDataSource = {
       `/api/portfolio-calendar?address=${encodeURIComponent(address)}&month=${encodeURIComponent(month)}`,
     );
   },
-
-  async backfill(address: string) {
-    return request<PortfolioCalendarResponse["backfill"]>(
-      "/api/portfolio-calendar",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
-      },
-    );
-  },
 };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {

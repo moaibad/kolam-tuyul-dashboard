@@ -60,7 +60,7 @@ describe("dashboard states", () => {
     await screen.findByText("Uniswap v4", {}, { timeout: 2_000 });
     await user.click(screen.getByRole("button", { name: "Track positions" }));
 
-    expect(screen.getByText("Syncing all positions...")).toBeInTheDocument();
+    expect(screen.getByText("Refreshing from Krystal...")).toBeInTheDocument();
     expect(screen.getByText("Uniswap v4")).toBeInTheDocument();
     expect(
       await screen.findByText(/Last synced \d+s ago/, {}, { timeout: 2_000 }),

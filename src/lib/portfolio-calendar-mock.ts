@@ -17,17 +17,13 @@ function position(
 ): CalendarPositionPnl {
   const depositedUsdg = 800 + index * 250;
   const claimedFeesUsdg = Math.max(4, Math.abs(pnl) * 0.18);
-  const isLateFee = index === 2 && pnl > 0;
   return {
     ...base,
     pnl,
-    kind: isLateFee ? "late_fee" : "closure",
-    lifecycle: index === 1 ? 2 : 1,
-    depositedUsdg: isLateFee ? 0 : depositedUsdg,
-    withdrawnUsdg:
-      isLateFee ? 0 : depositedUsdg + pnl - claimedFeesUsdg,
-    claimedFeesUsdg: isLateFee ? pnl : claimedFeesUsdg,
-    transactionUrl: "https://robinhoodchain.blockscout.com",
+    kind: "closure",
+    depositedUsdg,
+    withdrawnUsdg: depositedUsdg + pnl - claimedFeesUsdg,
+    claimedFeesUsdg,
   };
 }
 

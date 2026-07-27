@@ -52,7 +52,10 @@ export function PositionTrackerDashboard({
     promise: Promise<void>;
   } | null>(null);
 
-  const loadPortfolio = useCallback(async (walletAddress: string) => {
+  const loadPortfolio = useCallback(async (
+    walletAddress: string,
+    refresh = false,
+  ) => {
     const normalizedAddress = walletAddress.toLowerCase();
     const currentRequest = inFlightRef.current;
     if (currentRequest?.address === normalizedAddress) {
@@ -63,7 +66,7 @@ export function PositionTrackerDashboard({
     setIsRefreshing(true);
 
     const promise = httpPositionDataSource
-      .getPortfolio(walletAddress)
+      .getPortfolio(walletAddress, { refresh })
       .then((result) => {
         if (
           activeAddressRef.current.toLowerCase() === normalizedAddress &&
@@ -161,7 +164,7 @@ export function PositionTrackerDashboard({
 
   async function refresh() {
     if (!address || isRefreshing) return;
-    await loadPortfolio(address);
+    await loadPortfolio(address, true);
   }
 
   return (
@@ -233,8 +236,7 @@ export function PositionTrackerDashboard({
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] text-slate-600">
                 <span className="flex items-center gap-1.5">
                   <Database className="size-3" />
-                  Block{" "}
-                  {Number(displayedPortfolio.blockNumber).toLocaleString("en-US")}
+                  Data by Krystal
                 </span>
               </div>
             </div>
@@ -338,7 +340,7 @@ export function PositionTrackerDashboard({
                         {isRefreshing ? (
                           <>
                             <RefreshCw className="size-3.5 animate-spin text-violet-300" />
-                            Syncing all positions...
+                            Refreshing from Krystal...
                           </>
                         ) : (
                           <>
@@ -380,7 +382,7 @@ export function PositionTrackerDashboard({
                           <PositionCard
                             key={position.id}
                             position={position}
-                            nowMs={displayedPortfolio.updatedAtMs}
+                            nowMs={nowMs}
                           />
                         ))}
                     </div>

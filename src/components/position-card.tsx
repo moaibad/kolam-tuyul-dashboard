@@ -20,7 +20,6 @@ import {
   formatCurrency,
   formatNumber,
   formatPercent,
-  formatQuoteValue,
 } from "@/lib/format";
 import type { PositionSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -41,12 +40,9 @@ export function PositionCard({
   const formatQuote = (value: number | null, signed = false) =>
     value == null
       ? "Unavailable"
-      : formatQuoteValue(
-          value,
-          position.quoteToken.symbol,
-          position.quoteTokenPriceUsdg,
-          signed,
-        );
+      : signed && value > 0
+        ? `+${formatCurrency(value)}`
+        : formatCurrency(value);
 
   return (
     <Card
@@ -102,13 +98,21 @@ export function PositionCard({
 
         <div className="my-5 h-px bg-white/[0.055]" />
 
-        <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-4">
           <Metric
             label="Deposit"
             value={formatQuote(position.depositedValueQuote)}
           />
           <Metric
+            label="Withdrawn"
+            value={formatQuote(position.withdrawnUsdg ?? null)}
+          />
+          <Metric
             label="Current value"
+            value={formatQuote(position.totalResultValueQuote)}
+          />
+          <Metric
+            label="Liquidity"
             value={formatQuote(position.activeLpValueQuote)}
           />
           <Metric label="Total fees" value={formatQuote(totalFees)} />
@@ -123,8 +127,13 @@ export function PositionCard({
             valueClassName="text-cyan-300"
           />
           <Metric
-            label="Total result"
-            value={formatQuote(position.totalResultValueQuote)}
+            label="Impermanent loss"
+            value={formatQuote(position.impermanentLossUsdg ?? null, true)}
+            valueClassName={
+              (position.impermanentLossUsdg ?? 0) < 0
+                ? "text-rose-300"
+                : undefined
+            }
           />
         </div>
 
@@ -140,7 +149,9 @@ export function PositionCard({
             <p className="text-[10px] font-semibold tracking-[0.15em] text-slate-500 uppercase">
               Profit / Loss
             </p>
-            <p className="mt-1 text-[10px] text-slate-600">Includes IL + fees</p>
+            <p className="mt-1 text-[10px] text-slate-600">
+              Krystal P&amp;L including fees
+            </p>
           </div>
           <div className="text-right">
             <p
@@ -172,10 +183,12 @@ export function PositionCard({
               <Clock3 className="size-3.5" />
               Age {formatAge(nowMs, position.mintTimestampMs)}
             </span>
-            <span className="flex items-center gap-1.5">
-              <Layers3 className="size-3.5" />
-              Block {Number(position.blockNumber).toLocaleString("en-US")}
-            </span>
+            {position.apr != null && (
+              <span className="flex items-center gap-1.5">
+                <Layers3 className="size-3.5" />
+                APR {formatPercent(position.apr)}
+              </span>
+            )}
             {!inRange && position.outOfRangeSinceMs && (
               <span className="text-amber-400/80">
                 Out for {formatAge(nowMs, position.outOfRangeSinceMs)}

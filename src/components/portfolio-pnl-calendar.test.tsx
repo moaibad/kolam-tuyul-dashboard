@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dataSource = vi.hoisted(() => ({
   get: vi.fn(),
-  backfill: vi.fn(),
 }));
 
 vi.mock("@/lib/http-portfolio-calendar-data-source", () => ({
@@ -15,51 +14,43 @@ import { PortfolioPnlCalendar } from "@/components/portfolio-pnl-calendar";
 
 const ADDRESS = "0x0000000000000000000000000000000000000001";
 
-function calendar(
-  pair: string,
-  backfillState: "idle" | "running" | "complete" | "partial" | "failed",
-) {
+function calendar(pair = "WETH / USDC") {
   return {
     address: ADDRESS,
     timezone: "Asia/Bangkok" as const,
-    month: {
-      month: "2026-07",
-      days: [
-        {
-          date: "2026-07-20",
-          positions: [
-            {
-              id: pair,
-              pair,
-              version: "v4" as const,
-              pnl: 25,
-              kind: "closure" as const,
-              lifecycle: 1,
-              depositedUsdg: 100,
-              withdrawnUsdg: 120,
-              claimedFeesUsdg: 5,
-            },
-          ],
-        },
-      ],
-    },
-    backfill: {
-      state: backfillState,
-      completed: backfillState === "complete" ? 1 : 0,
-      total: 1,
-      retryable: backfillState !== "complete",
-    },
+    months: [
+      {
+        month: "2026-07",
+        days: [
+          {
+            date: "2026-07-20",
+            positions: [
+              {
+                id: pair,
+                pair,
+                version: "v4" as const,
+                pnl: 25,
+                kind: "closure" as const,
+                depositedUsdg: 100,
+                withdrawnUsdg: 120,
+                claimedFeesUsdg: 5,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    windowStart: "2025-07-28",
+    updatedAtMs: Date.now(),
   };
 }
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  let reject!: (error: unknown) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+  const promise = new Promise<T>((resolvePromise) => {
     resolve = resolvePromise;
-    reject = rejectPromise;
   });
-  return { promise, resolve, reject };
+  return { promise, resolve };
 }
 
 async function submitWallet(user: ReturnType<typeof userEvent.setup>) {
@@ -67,86 +58,59 @@ async function submitWallet(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Track positions" }));
 }
 
-describe("PortfolioPnlCalendar cache-first synchronization", () => {
+describe("PortfolioPnlCalendar Krystal loading", () => {
   beforeEach(() => {
     dataSource.get.mockReset();
-    dataSource.backfill.mockReset();
   });
 
-  it("renders cached events while synchronization is still running", async () => {
-    const sync = deferred<{
-      state: "complete";
-      completed: number;
-      total: number;
-      retryable: boolean;
-    }>();
-    dataSource.get
-      .mockResolvedValueOnce(calendar("CACHED / USDC", "complete"))
-      .mockResolvedValueOnce(calendar("UPDATED / USDC", "complete"));
-    dataSource.backfill.mockReturnValue(sync.promise);
+  it("renders closed positions from the rolling Krystal window", async () => {
+    dataSource.get.mockResolvedValue(calendar());
     const user = userEvent.setup();
     render(<PortfolioPnlCalendar />);
 
     await submitWallet(user);
 
-    expect(await screen.findByText("CACHED / USDC")).toBeInTheDocument();
+    expect(await screen.findByText("WETH / USDC")).toBeInTheDocument();
     expect(
-      screen.getByText("Checking for new withdrawals…"),
+      screen.getByText(
+        "Showing closed positions since 2025-07-28 · Data by Krystal",
+      ),
     ).toBeInTheDocument();
-
-    await act(async () => {
-      sync.resolve({
-        state: "complete",
-        completed: 1,
-        total: 1,
-        retryable: false,
-      });
-      await sync.promise;
-    });
-
-    expect(await screen.findByText("UPDATED / USDC")).toBeInTheDocument();
-    expect(screen.getByText("Realized history is up to date")).toBeInTheDocument();
+    expect(screen.getByText(/Position closure/)).toBeInTheDocument();
+    expect(dataSource.get).toHaveBeenCalledOnce();
   });
 
-  it("keeps cached events visible when synchronization fails", async () => {
-    dataSource.get.mockResolvedValueOnce(calendar("CACHED / USDC", "partial"));
-    dataSource.backfill.mockRejectedValueOnce(new Error("RPC unavailable"));
+  it("shows an upstream error and allows retry", async () => {
+    dataSource.get.mockRejectedValue(new Error("Krystal unavailable"));
     const user = userEvent.setup();
     render(<PortfolioPnlCalendar />);
 
     await submitWallet(user);
 
-    expect(await screen.findByText("CACHED / USDC")).toBeInTheDocument();
-    expect(await screen.findByText("RPC unavailable")).toBeInTheDocument();
-    expect(screen.getByText("CACHED / USDC")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry sync" })).toBeEnabled();
+    expect(await screen.findByText("Krystal unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    expect(
+      screen.getByText("Realized PnL history is unavailable"),
+    ).toBeInTheDocument();
   });
 
-  it("does not start a duplicate request for repeated submission", async () => {
-    const sync = deferred<{
-      state: "complete";
-      completed: number;
-      total: number;
-      retryable: boolean;
-    }>();
-    dataSource.get.mockResolvedValue(calendar("CACHED / USDC", "complete"));
-    dataSource.backfill.mockReturnValue(sync.promise);
+  it("keeps one request in flight for a wallet", async () => {
+    const request = deferred<ReturnType<typeof calendar>>();
+    dataSource.get.mockReturnValue(request.promise);
     const user = userEvent.setup();
     render(<PortfolioPnlCalendar />);
 
     await submitWallet(user);
-    expect(await screen.findByText("CACHED / USDC")).toBeInTheDocument();
-    expect(dataSource.backfill).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "Loading positions…" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Loading positions…" }),
+    ).toBeDisabled();
+    expect(dataSource.get).toHaveBeenCalledOnce();
 
     await act(async () => {
-      sync.resolve({
-        state: "complete",
-        completed: 1,
-        total: 1,
-        retryable: false,
-      });
-      await sync.promise;
+      request.resolve(calendar());
+      await request.promise;
     });
+
+    expect(await screen.findByText("WETH / USDC")).toBeInTheDocument();
   });
 });

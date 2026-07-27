@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
       process.env.DEMO_MODE === "true" ? getDemoPortfolio : getLivePortfolio;
     const portfolio = await loadPortfolio(
       request.nextUrl.searchParams.get("address") ?? "",
+      request.nextUrl.searchParams.get("refresh") === "1",
     );
     return Response.json(portfolio, {
       headers: { "Cache-Control": "no-store" },
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     return Response.json(
       {
         error:
-          "Live portfolio data could not be loaded from Robinhood Chain. Please try again.",
+          "Live portfolio data could not be loaded from Krystal. Please try again.",
       },
       { status: 502, headers: { "Cache-Control": "no-store" } },
     );

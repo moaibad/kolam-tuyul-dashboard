@@ -1,5 +1,5 @@
 export type CalendarPositionVersion = "v3" | "v4";
-export type RealizedEventKind = "closure" | "late_fee";
+export type RealizedEventKind = "closure";
 export type CalendarDataStatus =
   | "complete"
   | "partial"
@@ -12,11 +12,9 @@ export interface CalendarPositionPnl {
   version: CalendarPositionVersion;
   pnl: number;
   kind?: RealizedEventKind;
-  lifecycle?: number;
   depositedUsdg?: number;
   withdrawnUsdg?: number;
   claimedFeesUsdg?: number;
-  transactionUrl?: string;
 }
 
 export interface PortfolioCalendarDay {
@@ -30,19 +28,12 @@ export interface PortfolioCalendarMonth {
   days: PortfolioCalendarDay[];
 }
 
-export interface PortfolioCalendarBackfill {
-  state: "idle" | "running" | "complete" | "partial" | "failed";
-  completed: number;
-  total: number;
-  retryable: boolean;
-  error?: string;
-}
-
 export interface PortfolioCalendarResponse {
   address: string;
   timezone: "Asia/Bangkok";
-  month: PortfolioCalendarMonth;
-  backfill: PortfolioCalendarBackfill;
+  months: PortfolioCalendarMonth[];
+  windowStart: string;
+  updatedAtMs: number;
 }
 
 export interface PortfolioCalendarAnalytics {

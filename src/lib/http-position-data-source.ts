@@ -13,11 +13,14 @@ export class PortfolioDataSourceError extends Error {
 }
 
 export class HttpPositionDataSource implements PositionDataSource {
-  async getPortfolio(address: string): Promise<PortfolioSnapshot> {
+  async getPortfolio(
+    address: string,
+    options?: { refresh?: boolean },
+  ): Promise<PortfolioSnapshot> {
     let response: Response;
     try {
       response = await fetch(
-        `/api/portfolio?address=${encodeURIComponent(address)}`,
+        `/api/portfolio?address=${encodeURIComponent(address)}${options?.refresh ? "&refresh=1" : ""}`,
         {
           cache: "no-store",
           headers: { Accept: "application/json" },

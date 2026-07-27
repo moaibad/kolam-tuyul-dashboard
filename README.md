@@ -16,7 +16,8 @@
 # KolamTuyul Dashboard
 
 A read-only dashboard for monitoring Uniswap v3 and v4 liquidity positions on
-Robinhood Chain. It reads public on-chain data through a server-side API and
+Robinhood Chain. It reads public position data from Krystal through a
+server-side API and
 never requests a wallet connection, signature, private key, or seed phrase.
 
 ## Features
@@ -24,22 +25,19 @@ never requests a wallet connection, signature, private key, or seed phrase.
 - Discovers open Uniswap v3 and v4 positions for any public EVM address.
 - Displays current liquidity value, token composition, price range, and
   unclaimed fees.
-- Reconstructs deposits, withdrawals, claimed fees, and profit/loss from
-  historical on-chain events.
-- Provides a Bangkok-time realized PnL calendar. A lifecycle is recorded only
-  after principal withdrawal is detected and valued successfully; active or
-  pending-withdrawal liquidity is excluded.
-- Keeps blockchain and Blockscout access on the server.
-- Stores accounting checkpoints in Turso for resumable historical scans.
-- Preserves available real-time data when historical accounting is incomplete
-  and resumes from the last completed block.
+- Displays Krystal deposit, withdrawal, fee, APR, impermanent-loss, and PnL
+  metrics in USD.
+- Provides a Bangkok-time realized PnL calendar for closed positions during
+  the latest 365 days.
+- Uses Krystal's cached snapshot for fast initial loads and requests a fresh
+  on-chain snapshot when the user presses refresh.
+- Requires no database, RPC endpoint, API key, wallet connection, or secret.
 
 ## Requirements
 
 - Node.js 20 or newer
 - npm
-- A Turso database with its URL and a full-access auth token
-- Network access to the Robinhood Chain public RPC and Blockscout
+- Network access to `api.krystal.app`
 
 ## Setup
 
@@ -47,37 +45,28 @@ never requests a wallet connection, signature, private key, or seed phrase.
 npm install
 ```
 
-Create `.env` from `.env.example` and set the required values:
-
-```env
-ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com
-TURSO_DATABASE_URL=libsql://your-database.turso.io
-TURSO_AUTH_TOKEN=your-auth-token
-```
-
 ```bash
-npm run db:migrate
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Keep `.env` out of version
-control and never expose `TURSO_AUTH_TOKEN` in client-side code.
+Open [http://localhost:3000](http://localhost:3000).
 
 ## API
 
-### `GET /api/portfolio?address={EVM_ADDRESS}`
+### `GET /api/portfolio?address={EVM_ADDRESS}&refresh={0|1}`
 
 - Returns `200` with the serialized portfolio snapshot.
+- Uses Krystal cached data by default; `refresh=1` requests fresh on-chain data.
 - Returns `400` when the address is missing or invalid.
-- Returns `502` when upstream blockchain data cannot be loaded.
+- Returns `502` when Krystal data cannot be loaded or validated.
 - Always sends `Cache-Control: no-store`.
 
 ### `GET /api/portfolio-calendar?address={EVM_ADDRESS}&month={YYYY-MM}`
 
-- Returns realized position closures and late fee claims grouped by Bangkok
-  calendar day.
-- Excludes active positions, uncollected principal, and withdrawals whose
-  historical USDG valuation is unavailable.
+- Returns closed positions grouped by Krystal `closedTime` in Bangkok time.
+- Includes every day in the latest 365-day window, including the partial
+  boundary months.
+- Uses Krystal's aggregate PnL, deposit, withdrawal, and claimed-fee values.
 - Always sends `Cache-Control: no-store`.
 
 ## Verification

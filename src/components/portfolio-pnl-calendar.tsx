@@ -3,7 +3,6 @@
 import {
   AlertTriangle,
   ArrowDownRight,
-  ArrowUpRight as ExternalLink,
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
@@ -71,7 +70,7 @@ export function PortfolioPnlCalendar({
     setAddress(walletAddress);
     setIsLoading(true);
     setError("");
-    setProgress("Loading saved realized PnL…");
+    setProgress("Loading closed positions from Krystal…");
     if (
       displayedAddress &&
       displayedAddress.toLowerCase() !== normalizedAddress
@@ -85,47 +84,17 @@ export function PortfolioPnlCalendar({
       latestRequestRef.current === requestId;
 
     const promise = (async () => {
-      let hasCachedCalendar = false;
       try {
-        const cached = await httpPortfolioCalendarDataSource.get(
+        const response = await httpPortfolioCalendarDataSource.get(
           walletAddress,
           currentMonth,
         );
         if (!isCurrentRequest()) return;
-        hasCachedCalendar = true;
-        setMonths([cached.month]);
-        setDisplayedAddress(walletAddress);
-        setProgress(syncMessage(cached.backfill.state));
-        setError(cached.backfill.error ?? "");
-      } catch (cacheError) {
-        if (!isCurrentRequest()) return;
-        setProgress("Discovering withdrawn LP positions…");
-        setError(
-          cacheError instanceof Error
-            ? cacheError.message
-            : "Saved realized PnL could not be loaded.",
-        );
-      }
-
-      try {
-        const backfill =
-          await httpPortfolioCalendarDataSource.backfill(walletAddress);
-        if (!isCurrentRequest()) return;
-        if (backfill.error) setError(backfill.error);
-
-        const refreshed = await httpPortfolioCalendarDataSource.get(
-          walletAddress,
-          currentMonth,
-        );
-        if (!isCurrentRequest()) return;
-        setMonths([refreshed.month]);
+        setMonths(response.months);
         setDisplayedAddress(walletAddress);
         setProgress(
-          refreshed.backfill.state === "complete"
-            ? "Realized history is up to date"
-            : `Indexed ${refreshed.backfill.completed} of ${refreshed.backfill.total} positions`,
+          `Showing closed positions since ${response.windowStart} · Data by Krystal`,
         );
-        setError(refreshed.backfill.error ?? "");
       } catch (syncError) {
         if (!isCurrentRequest()) return;
         setError(
@@ -133,9 +102,7 @@ export function PortfolioPnlCalendar({
             ? syncError.message
             : "Realized PnL synchronization failed.",
         );
-        if (!hasCachedCalendar) {
-          setProgress("Realized PnL history is unavailable");
-        }
+        setProgress("Realized PnL history is unavailable");
       } finally {
         if (isCurrentRequest()) {
           setIsLoading(false);
@@ -171,8 +138,8 @@ export function PortfolioPnlCalendar({
               Realized LP performance
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
-              Only fully withdrawn positions are counted. Active and partially
-              withdrawn liquidity stays outside the calendar.
+              Closed positions are grouped by their Krystal closing time.
+              The calendar covers the latest 365 days.
             </p>
           </div>
           <div className="min-w-0 w-full max-w-full xl:max-w-2xl">
@@ -215,7 +182,7 @@ export function PortfolioPnlCalendar({
               className="border-amber-200/20 bg-amber-200/[0.06] text-amber-50 hover:bg-amber-200/10"
             >
               <RefreshCw className="size-3.5" />
-              Retry sync
+              Retry
             </Button>
           )}
         </div>
@@ -230,8 +197,8 @@ export function PortfolioPnlCalendar({
             Enter a wallet to build its realized PnL calendar
           </h3>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
-            Full withdrawals and post-closure fee claims will appear on their
-            transaction date in Bangkok time.
+            Closed Uniswap positions will appear on their Krystal closing date
+            in Bangkok time.
           </p>
         </div>
       )}
@@ -310,7 +277,7 @@ function CalendarView({
               {formatSignedCurrency(analytics.totalPnl)}
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              {analytics.activeDays} days with completed withdrawals or late fee claims
+              {analytics.activeDays} days with closed positions
               {monthDelta != null && (
                 <span
                   className={cn(
@@ -628,21 +595,8 @@ function DayDetail({ day }: { day: PortfolioCalendarDay }) {
                     {formatSignedCurrency(position.pnl)}
                   </p>
                   <p className="mt-1 text-[10px] text-slate-500">
-                    {position.kind === "late_fee"
-                      ? "Late fee claim"
-                      : `Lifecycle ${position.lifecycle ?? 1} closure`}{" "}
-                    · {formatNumber(contribution, 1)}%
+                    Position closure · {formatNumber(contribution, 1)}%
                   </p>
-                  {position.transactionUrl && (
-                    <a
-                      href={position.transactionUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-flex items-center gap-1 text-[11px] text-violet-300 hover:text-violet-200"
-                    >
-                      Transaction <ExternalLink className="size-3" />
-                    </a>
-                  )}
                 </div>
               </div>
             );
@@ -729,15 +683,4 @@ function getBangkokMonth() {
   const year = parts.find((part) => part.type === "year")?.value;
   const month = parts.find((part) => part.type === "month")?.value;
   return `${year}-${month}`;
-}
-
-function syncMessage(
-  state: "idle" | "running" | "complete" | "partial" | "failed",
-) {
-  if (state === "complete") return "Checking for new withdrawals…";
-  if (state === "partial" || state === "failed") {
-    return "Resuming realized PnL history…";
-  }
-  if (state === "running") return "Synchronizing realized PnL history…";
-  return "Discovering withdrawn LP positions…";
 }
