@@ -51,7 +51,51 @@ describe("Krystal API adapter", () => {
       netLpResultQuote: 15,
       netLpResultPercent: 15,
     });
+    expect(portfolio.positions[0].token0.logoUrl).toBe(
+      "https://cdn.example/weth.png",
+    );
+    expect(portfolio.positions[0].token1.logoUrl).toBe(
+      "http://cdn.example/usdc.png",
+    );
     expect(portfolio.positions[0].amounts[0].formatted).toBe("2");
+  });
+
+  it("ignores empty, malformed, and non-HTTP token logo URLs", () => {
+    const portfolio = mapKrystalPortfolio(ADDRESS, {
+      positions: [
+        position({
+          id: "unsafe-logos",
+          token0Logo: "javascript:alert(1)",
+          token1Logo: "not a URL",
+        }),
+        position({
+          id: "empty-logo",
+          token0Logo: " ",
+        }),
+      ],
+      stats: null,
+      warnings: [],
+    });
+
+    expect(portfolio.positions[0].token0.logoUrl).toBeUndefined();
+    expect(portfolio.positions[0].token1.logoUrl).toBeUndefined();
+    expect(portfolio.positions[1].token0.logoUrl).toBeUndefined();
+  });
+
+  it("skips positions with non-positive or inverted Krystal price ranges", () => {
+    const portfolio = mapKrystalPortfolio(ADDRESS, {
+      positions: [
+        position({ id: "zero-price", price: 0 }),
+        position({ id: "zero-lower", minPrice: 0 }),
+        position({ id: "inverted", minPrice: 2_500, maxPrice: 1_500 }),
+      ],
+      stats: null,
+      warnings: [],
+    });
+
+    expect(portfolio.positions).toEqual([]);
+    expect(portfolio.warnings).toHaveLength(3);
+    expect(portfolio.totals.partial).toBe(true);
   });
 
   it("accepts seconds, milliseconds, numeric strings, and ISO timestamps", () => {
@@ -156,7 +200,15 @@ describe("Krystal API adapter", () => {
 });
 
 function position(
-  overrides: { id?: string; projectKey?: string } = {},
+  overrides: {
+    id?: string;
+    projectKey?: string;
+    price?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    token0Logo?: string;
+    token1Logo?: string;
+  } = {},
 ): Record<string, unknown> {
   const token0 = {
     token: {
@@ -164,6 +216,7 @@ function position(
       symbol: "WETH",
       decimals: 18,
       price: 2_000,
+      logo: overrides.token0Logo ?? "https://cdn.example/weth.png",
     },
     balance: "2000000000000000000",
     quotes: { usd: { price: 2_000, value: 4_000 } },
@@ -174,6 +227,7 @@ function position(
       symbol: "USDC",
       decimals: 6,
       price: 1,
+      logo: overrides.token1Logo ?? "http://cdn.example/usdc.png",
     },
     balance: "100000000",
     quotes: { usd: { price: 1, value: 100 } },
@@ -183,8 +237,8 @@ function position(
     tokenAddress: "0x0000000000000000000000000000000000000004",
     tokenId: "42",
     liquidity: "123",
-    minPrice: 1_500,
-    maxPrice: 2_500,
+    minPrice: overrides.minPrice ?? 1_500,
+    maxPrice: overrides.maxPrice ?? 2_500,
     currentAmounts: [token0, token1],
     feePending: [
       { ...token1, balance: "3000000", quotes: { usd: { value: 3 } } },
@@ -204,7 +258,7 @@ function position(
     status: "IN_RANGE",
     pool: {
       projectKey: overrides.projectKey ?? "uniswapv3",
-      price: 2_000,
+      price: overrides.price ?? 2_000,
       fees: ["0.0005"],
       tokenAmounts: [token0, token1],
     },

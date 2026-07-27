@@ -248,12 +248,17 @@ export function mapKrystalPosition(
   const withdrawn = numberValue(raw.totalWithdrawValue) ?? 0;
   const pnl = numberValue(raw.pnl) ?? 0;
   const calculatedRoi = deposited > 0 ? (pnl / deposited) * 100 : null;
-  const lowerPrice = requiredNumber(raw.minPrice, "minPrice");
-  const upperPrice = requiredNumber(raw.maxPrice, "maxPrice");
+  const lowerPrice = requiredPositiveNumber(raw.minPrice, "minPrice");
+  const upperPrice = requiredPositiveNumber(raw.maxPrice, "maxPrice");
+  if (lowerPrice > upperPrice) {
+    throw new Error("price range is invalid");
+  }
   const currentPrice =
-    numberValue(pool.price) ??
-    numberValue(raw.currentPrice) ??
-    lowerPrice;
+    positiveNumberValue(pool.price) ??
+    positiveNumberValue(raw.currentPrice);
+  if (currentPrice == null) {
+    throw new Error("currentPrice is missing or invalid");
+  }
   const tokenAddress = requiredString(raw.tokenAddress, "tokenAddress");
   const tokenId = requiredString(raw.tokenId, "tokenId");
   const id =
@@ -331,6 +336,7 @@ function mapTokenAmount(raw: Record<string, unknown>): TokenAmount {
     address: requiredString(tokenRecord.address, "token address"),
     symbol: requiredString(tokenRecord.symbol, "token symbol"),
     decimals: numberValue(tokenRecord.decimals) ?? 18,
+    logoUrl: safeImageUrl(tokenRecord.logo),
   };
   const balance = stringValue(raw.balance) ?? "0";
   return {
@@ -431,10 +437,15 @@ function requiredString(value: unknown, field: string) {
   return result;
 }
 
-function requiredNumber(value: unknown, field: string) {
-  const result = numberValue(value);
-  if (result == null) throw new Error(`${field} is missing`);
+function requiredPositiveNumber(value: unknown, field: string) {
+  const result = positiveNumberValue(value);
+  if (result == null) throw new Error(`${field} is missing or invalid`);
   return result;
+}
+
+function positiveNumberValue(value: unknown) {
+  const result = numberValue(value);
+  return result != null && result > 0 ? result : null;
 }
 
 function recordArray(value: unknown) {
@@ -453,6 +464,19 @@ function stringValue(value: unknown) {
   if (typeof value === "string") return value;
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   return null;
+}
+
+function safeImageUrl(value: unknown) {
+  const raw = stringValue(value)?.trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function numberValue(value: unknown) {

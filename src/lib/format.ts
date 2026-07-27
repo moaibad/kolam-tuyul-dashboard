@@ -62,6 +62,34 @@ export function formatPrice(value: number) {
   return value.toFixed(digits).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+export function getPairOrientedPriceRange(
+  currentPrice: number,
+  lowerPrice: number,
+  upperPrice: number,
+) {
+  if (
+    ![currentPrice, lowerPrice, upperPrice].every(
+      (value) => Number.isFinite(value) && value > 0,
+    )
+  ) {
+    throw new RangeError("Price range values must be positive finite numbers.");
+  }
+
+  return {
+    currentPrice: 1 / currentPrice,
+    lowerPrice: 1 / upperPrice,
+    upperPrice: 1 / lowerPrice,
+  };
+}
+
+export function formatPairPriceUnit(token0Symbol: string, token1Symbol: string) {
+  return `${formatPriceTokenSymbol(token0Symbol)}/${formatPriceTokenSymbol(token1Symbol)}`;
+}
+
+function formatPriceTokenSymbol(symbol: string) {
+  return symbol.toUpperCase() === "WETH" ? "ETH" : symbol;
+}
+
 export function formatCompactAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }

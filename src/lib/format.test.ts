@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatCurrency,
+  formatPairPriceUnit,
   formatPercent,
   formatPrice,
   formatQuoteValue,
   formatSyncAge,
+  getPairOrientedPriceRange,
+  getPriceRangeProgress,
   getRangeProgress,
   isValidWalletAddress,
 } from "@/lib/format";
@@ -69,4 +72,41 @@ describe("range progress", () => {
       });
     },
   );
+
+  it("inverts Krystal prices into pair order and swaps the boundaries", () => {
+    const prices = getPairOrientedPriceRange(2_000, 1_500, 2_500);
+
+    expect(prices).toEqual({
+      currentPrice: 0.0005,
+      lowerPrice: 0.0004,
+      upperPrice: 1 / 1_500,
+    });
+    expect(
+      getPriceRangeProgress(
+        prices.currentPrice,
+        prices.lowerPrice,
+        prices.upperPrice,
+      ),
+    ).toMatchObject({ placement: "inside" });
+  });
+
+  it("reverses below and above placement with the inverted orientation", () => {
+    const prices = getPairOrientedPriceRange(3_000, 1_500, 2_500);
+
+    expect(
+      getPriceRangeProgress(
+        prices.currentPrice,
+        prices.lowerPrice,
+        prices.upperPrice,
+      ),
+    ).toEqual({ placement: "below", percent: 0 });
+  });
+
+  it("formats pair units and rejects prices that cannot be inverted", () => {
+    expect(formatPairPriceUnit("WETH", "USDG")).toBe("ETH/USDG");
+    expect(formatPairPriceUnit("INDEX", "USDG")).toBe("INDEX/USDG");
+    expect(() => getPairOrientedPriceRange(0, 1_500, 2_500)).toThrow(
+      "positive finite",
+    );
+  });
 });

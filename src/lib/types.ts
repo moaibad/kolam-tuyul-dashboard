@@ -6,6 +6,7 @@ export interface TokenInfo {
   address: string;
   symbol: string;
   decimals: number;
+  logoUrl?: string;
 }
 
 export interface TokenAmount {

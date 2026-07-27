@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 
 import { RangeVisualizer } from "@/components/range-visualizer";
+import { TokenPairIcon } from "@/components/token-pair-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -60,7 +61,10 @@ export function PositionCard({
       <div className="p-5 sm:p-6">
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div className="flex min-w-0 items-center gap-3">
-            <TokenPair position={position} />
+            <TokenPairIcon
+              token0={position.token0}
+              token1={position.token1}
+            />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="truncate text-xl font-semibold tracking-[-0.025em] text-slate-50">
@@ -104,27 +108,27 @@ export function PositionCard({
             value={formatQuote(position.depositedValueQuote)}
           />
           <Metric
-            label="Withdrawn"
-            value={formatQuote(position.withdrawnUsdg ?? null)}
+            label="Liquidity"
+            value={formatQuote(position.activeLpValueQuote)}
           />
           <Metric
             label="Current value"
             value={formatQuote(position.totalResultValueQuote)}
           />
           <Metric
-            label="Liquidity"
-            value={formatQuote(position.activeLpValueQuote)}
+            label="Withdrawn"
+            value={formatQuote(position.withdrawnUsdg ?? null)}
           />
           <Metric label="Total fees" value={formatQuote(totalFees)} />
-          <Metric
-            label="Claimed"
-            value={formatQuote(position.claimedFeesValueQuote)}
-            subdued
-          />
           <Metric
             label="Unclaimed"
             value={formatQuote(position.unclaimedFeesValueQuote)}
             valueClassName="text-cyan-300"
+          />
+          <Metric
+            label="Claimed"
+            value={formatQuote(position.claimedFeesValueQuote)}
+            subdued
           />
           <Metric
             label="Impermanent loss"
@@ -219,19 +223,6 @@ export function PositionCard({
         </footer>
       </div>
     </Card>
-  );
-}
-
-function TokenPair({ position }: { position: PositionSnapshot }) {
-  return (
-    <div className="relative h-11 w-[66px] shrink-0">
-      <div className="absolute left-0 grid size-11 place-items-center rounded-2xl bg-violet-600 text-xs font-bold text-white ring-4 ring-card">
-        {position.token0.symbol.slice(0, 2)}
-      </div>
-      <div className="absolute right-0 grid size-11 place-items-center rounded-2xl bg-cyan-400 text-xs font-bold text-[#10101d] ring-4 ring-card">
-        {position.token1.symbol.slice(0, 2)}
-      </div>
-    </div>
   );
 }
 

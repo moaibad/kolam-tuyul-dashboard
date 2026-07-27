@@ -3,7 +3,12 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-import { formatPrice, getPriceRangeProgress } from "@/lib/format";
+import {
+  formatPairPriceUnit,
+  formatPrice,
+  getPairOrientedPriceRange,
+  getPriceRangeProgress,
+} from "@/lib/format";
 import type { PositionSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +17,19 @@ export function RangeVisualizer({
 }: {
   position: PositionSnapshot;
 }) {
-  const progress = getPriceRangeProgress(
+  const displayPrices = getPairOrientedPriceRange(
     position.currentPrice,
     position.lowerPrice,
     position.upperPrice,
+  );
+  const progress = getPriceRangeProgress(
+    displayPrices.currentPrice,
+    displayPrices.lowerPrice,
+    displayPrices.upperPrice,
+  );
+  const priceUnit = formatPairPriceUnit(
+    position.token0.symbol,
+    position.token1.symbol,
   );
   const isInside = progress.placement === "inside";
   const [copiedBoundary, setCopiedBoundary] = useState<
@@ -51,21 +65,17 @@ export function RangeVisualizer({
         isInside ? "border-emerald-300/10" : "border-amber-300/20",
       )}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div>
         <div>
           <p className="text-xs font-medium text-slate-400">
             Current price
           </p>
           <p className="mt-1 text-xl font-semibold text-slate-50">
-            {formatPrice(position.currentPrice)}{" "}
+            {formatPrice(displayPrices.currentPrice)}{" "}
             <span className="text-xs font-medium text-slate-500">
-              {position.token1.symbol} / {position.token0.symbol}
+              {priceUnit}
             </span>
           </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs font-medium text-slate-500">Source</p>
-          <p className="mt-1 text-xs text-slate-400">Krystal</p>
         </div>
       </div>
 
@@ -105,13 +115,15 @@ export function RangeVisualizer({
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => copyBoundary("lower", position.lowerPrice)}
+          onClick={() => copyBoundary("lower", displayPrices.lowerPrice)}
           className="group min-w-0 cursor-pointer rounded-lg p-2 text-left transition-colors hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-          aria-label={`Copy lower price ${formatPrice(position.lowerPrice)}`}
+          aria-label={`Copy lower price ${formatPrice(displayPrices.lowerPrice)} ${priceUnit}`}
         >
           <p className="text-[10px] text-slate-600">Lower</p>
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 font-mono text-xs text-slate-400 group-hover:text-slate-200">
-            <span className="truncate">{formatPrice(position.lowerPrice)}</span>
+            <span className="truncate">
+              {formatPrice(displayPrices.lowerPrice)} {priceUnit}
+            </span>
             {copiedBoundary === "lower" ? (
               <Check className="size-3.5 shrink-0 text-emerald-300" />
             ) : (
@@ -121,9 +133,9 @@ export function RangeVisualizer({
         </button>
         <button
           type="button"
-          onClick={() => copyBoundary("upper", position.upperPrice)}
+          onClick={() => copyBoundary("upper", displayPrices.upperPrice)}
           className="group min-w-0 cursor-pointer rounded-lg p-2 text-right transition-colors hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-          aria-label={`Copy upper price ${formatPrice(position.upperPrice)}`}
+          aria-label={`Copy upper price ${formatPrice(displayPrices.upperPrice)} ${priceUnit}`}
         >
           <p className="text-[10px] text-slate-600">Upper</p>
           <span className="mt-0.5 flex min-w-0 items-center justify-end gap-1.5 font-mono text-xs text-slate-400 group-hover:text-slate-200">
@@ -132,7 +144,9 @@ export function RangeVisualizer({
             ) : (
               <Copy className="size-3.5 shrink-0" />
             )}
-            <span className="truncate">{formatPrice(position.upperPrice)}</span>
+            <span className="truncate">
+              {formatPrice(displayPrices.upperPrice)} {priceUnit}
+            </span>
           </span>
         </button>
       </div>
