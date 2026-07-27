@@ -15,7 +15,7 @@ export class PortfolioDataSourceError extends Error {
 export class HttpPositionDataSource implements PositionDataSource {
   async getPortfolio(
     address: string,
-    options?: { refresh?: boolean },
+    options?: { refresh?: boolean; signal?: AbortSignal },
   ): Promise<PortfolioSnapshot> {
     let response: Response;
     try {
@@ -24,9 +24,13 @@ export class HttpPositionDataSource implements PositionDataSource {
         {
           cache: "no-store",
           headers: { Accept: "application/json" },
+          signal: options?.signal,
         },
       );
-    } catch {
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw error;
+      }
       throw new PortfolioDataSourceError(
         "The portfolio service is unreachable. Check your connection and try again.",
         0,
@@ -55,6 +59,15 @@ export class HttpPositionDataSource implements PositionDataSource {
 
     return body as PortfolioSnapshot;
   }
+}
+
+function isAbortError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  );
 }
 
 function getFallbackErrorMessage(status: number) {

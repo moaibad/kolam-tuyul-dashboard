@@ -22,11 +22,17 @@ import {
   formatSyncAge,
 } from "@/lib/format";
 import { httpPositionDataSource } from "@/lib/http-position-data-source";
+import {
+  getLiveRefreshRetryDelayMs,
+  isLiveSnapshotStale,
+  LIVE_REFRESH_INTERVAL_MS,
+} from "@/lib/realtime-refresh";
 import type { PortfolioSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const AUTO_REFETCH_INTERVAL_MS = 90_000;
 const DEMO_WALLET_ADDRESS = "0x0000000000000000000000000000000000000001";
+type RefreshPhase = "idle" | "initial" | "background" | "manual";
+type RefreshKind = Exclude<RefreshPhase, "idle">;
 
 export function PositionTrackerDashboard({
   demoMode = false,
@@ -41,111 +47,282 @@ export function PositionTrackerDashboard({
     address: string;
     message: string;
   } | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshPhase, setRefreshPhase] = useState<RefreshPhase>("idle");
   const [isOffline, setIsOffline] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+  const [lastFreshAtMs, setLastFreshAtMs] = useState<number | null>(null);
+  const [nextPollAtMs, setNextPollAtMs] = useState<number | null>(null);
+  const [backgroundRefreshDelayed, setBackgroundRefreshDelayed] =
+    useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const activeAddressRef = useRef(address);
+  const onlineRef = useRef(
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  const pageVisibleRef = useRef(
+    typeof document === "undefined"
+      ? true
+      : document.visibilityState === "visible",
+  );
+  const lastFreshAtRef = useRef<number | null>(null);
+  const consecutiveFailuresRef = useRef(0);
   const latestRequestRef = useRef(0);
   const inFlightRef = useRef<{
     address: string;
     requestId: number;
-    promise: Promise<void>;
+    refresh: boolean;
+    controller: AbortController;
+    promise: Promise<boolean>;
   } | null>(null);
 
-  const loadPortfolio = useCallback(async (
-    walletAddress: string,
-    refresh = false,
-  ) => {
-    const normalizedAddress = walletAddress.toLowerCase();
-    const currentRequest = inFlightRef.current;
-    if (currentRequest?.address === normalizedAddress) {
-      return currentRequest.promise;
-    }
+  const loadPortfolio = useCallback(
+    (
+      walletAddress: string,
+      options: { refresh: boolean; kind: RefreshKind },
+    ): Promise<boolean> => {
+      const normalizedAddress = walletAddress.toLowerCase();
+      const currentRequest = inFlightRef.current;
+      if (currentRequest?.address === normalizedAddress) {
+        if (options.refresh && !currentRequest.refresh) {
+          return currentRequest.promise.then(() =>
+            loadPortfolio(walletAddress, options),
+          );
+        }
+        return currentRequest.promise;
+      }
+      if (currentRequest) {
+        currentRequest.controller.abort();
+      }
 
-    const requestId = ++latestRequestRef.current;
-    setIsRefreshing(true);
+      const requestId = ++latestRequestRef.current;
+      const controller = new AbortController();
+      setRefreshPhase(options.kind);
 
-    const promise = httpPositionDataSource
-      .getPortfolio(walletAddress, { refresh })
-      .then((result) => {
-        if (
-          activeAddressRef.current.toLowerCase() === normalizedAddress &&
-          latestRequestRef.current === requestId
-        ) {
+      const promise = httpPositionDataSource
+        .getPortfolio(walletAddress, {
+          refresh: options.refresh,
+          signal: controller.signal,
+        })
+        .then((result) => {
+          if (
+            activeAddressRef.current.toLowerCase() !== normalizedAddress ||
+            latestRequestRef.current !== requestId
+          ) {
+            return false;
+          }
+
+          const receivedAtMs = Date.now();
           setPortfolio(result);
           setLoadFailure(null);
-          setNowMs(Date.now());
-        }
-      })
-      .catch((error) => {
-        if (
-          activeAddressRef.current.toLowerCase() === normalizedAddress &&
-          latestRequestRef.current === requestId
-        ) {
-          setLoadFailure({
-            address: normalizedAddress,
-            message:
-              error instanceof Error
-                ? error.message
-                : "Live portfolio could not be loaded. Please try again.",
-          });
-        }
-      })
-      .finally(() => {
-        if (inFlightRef.current?.requestId === requestId) {
-          inFlightRef.current = null;
-        }
-        if (
-          activeAddressRef.current.toLowerCase() === normalizedAddress &&
-          latestRequestRef.current === requestId
-        ) {
-          setIsRefreshing(false);
-        }
-      });
+          setNowMs(receivedAtMs);
+          if (options.refresh) {
+            lastFreshAtRef.current = receivedAtMs;
+            setLastFreshAtMs(receivedAtMs);
+            setBackgroundRefreshDelayed(false);
+          }
+          return true;
+        })
+        .catch((error) => {
+          if (
+            isAbortError(error) ||
+            activeAddressRef.current.toLowerCase() !== normalizedAddress ||
+            latestRequestRef.current !== requestId
+          ) {
+            return false;
+          }
 
-    inFlightRef.current = { address: normalizedAddress, requestId, promise };
-    return promise;
-  }, []);
+          if (options.kind === "background") {
+            setBackgroundRefreshDelayed(true);
+          } else {
+            setLoadFailure({
+              address: normalizedAddress,
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Live portfolio could not be loaded. Please try again.",
+            });
+          }
+          return false;
+        })
+        .finally(() => {
+          if (inFlightRef.current?.requestId === requestId) {
+            inFlightRef.current = null;
+          }
+          if (
+            activeAddressRef.current.toLowerCase() === normalizedAddress &&
+            latestRequestRef.current === requestId
+          ) {
+            setRefreshPhase("idle");
+          }
+        });
 
-  useEffect(() => {
-    const updateConnection = () => setIsOffline(!window.navigator.onLine);
-    updateConnection();
-    window.addEventListener("online", updateConnection);
-    window.addEventListener("offline", updateConnection);
-    return () => {
-      window.removeEventListener("online", updateConnection);
-      window.removeEventListener("offline", updateConnection);
-    };
-  }, []);
+      inFlightRef.current = {
+        address: normalizedAddress,
+        requestId,
+        refresh: options.refresh,
+        controller,
+        promise,
+      };
+      return promise;
+    },
+    [],
+  );
 
-  useEffect(() => {
-    activeAddressRef.current = address;
-    if (!address) {
-      latestRequestRef.current += 1;
+  const scheduleAfterFreshAttempt = useCallback((success: boolean) => {
+    if (success) {
+      consecutiveFailuresRef.current = 0;
+      setBackgroundRefreshDelayed(false);
+      setNextPollAtMs(Date.now() + LIVE_REFRESH_INTERVAL_MS);
       return;
     }
-    void loadPortfolio(address);
-  }, [address, loadPortfolio]);
+
+    consecutiveFailuresRef.current += 1;
+    setBackgroundRefreshDelayed(true);
+    setNextPollAtMs(
+      Date.now() +
+        getLiveRefreshRetryDelayMs(consecutiveFailuresRef.current),
+    );
+  }, []);
+
+  const refreshInBackground = useCallback(
+    async (walletAddress: string) => {
+      setNextPollAtMs(null);
+      const success = await loadPortfolio(walletAddress, {
+        refresh: true,
+        kind: "background",
+      });
+      if (
+        activeAddressRef.current.toLowerCase() === walletAddress.toLowerCase()
+      ) {
+        scheduleAfterFreshAttempt(success);
+      }
+      return success;
+    },
+    [loadPortfolio, scheduleAfterFreshAttempt],
+  );
+
+  const refreshIfStale = useCallback(() => {
+    if (
+      !address ||
+      !onlineRef.current ||
+      !pageVisibleRef.current
+    ) {
+      return;
+    }
+
+    const currentTimeMs = Date.now();
+    if (isLiveSnapshotStale(currentTimeMs, lastFreshAtRef.current)) {
+      void refreshInBackground(address);
+      return;
+    }
+
+    setNextPollAtMs(
+      lastFreshAtRef.current! + LIVE_REFRESH_INTERVAL_MS,
+    );
+  }, [address, refreshInBackground]);
 
   useEffect(() => {
-    if (!address) return;
+    const updateConnection = () => {
+      const online = window.navigator.onLine;
+      onlineRef.current = online;
+      setIsOffline(!online);
+      if (online) refreshIfStale();
+      else setNextPollAtMs(null);
+    };
+    const updateVisibility = () => {
+      const visible = document.visibilityState === "visible";
+      pageVisibleRef.current = visible;
+      setIsPageVisible(visible);
+      if (visible) refreshIfStale();
+      else setNextPollAtMs(null);
+    };
 
-    const interval = window.setInterval(() => {
-      if (window.navigator.onLine && document.visibilityState === "visible") {
-        void loadPortfolio(address);
+    const initialStatusTimer = window.setTimeout(() => {
+      const online = window.navigator.onLine;
+      const visible = document.visibilityState === "visible";
+      onlineRef.current = online;
+      pageVisibleRef.current = visible;
+      setIsOffline(!online);
+      setIsPageVisible(visible);
+    }, 0);
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", updateVisibility);
+    return () => {
+      window.clearTimeout(initialStatusTimer);
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", updateVisibility);
+    };
+  }, [refreshIfStale]);
+
+  useEffect(() => {
+    const normalizedAddress = address.toLowerCase();
+    activeAddressRef.current = normalizedAddress;
+    lastFreshAtRef.current = null;
+    consecutiveFailuresRef.current = 0;
+
+    if (!address) {
+      latestRequestRef.current += 1;
+      inFlightRef.current?.controller.abort();
+      inFlightRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      await loadPortfolio(address, { refresh: false, kind: "initial" });
+      if (
+        cancelled ||
+        activeAddressRef.current !== normalizedAddress
+      ) {
+        return;
       }
-    }, AUTO_REFETCH_INTERVAL_MS);
+      if (onlineRef.current && pageVisibleRef.current) {
+        await refreshInBackground(address);
+      }
+    })();
 
     return () => {
-      window.clearInterval(interval);
+      cancelled = true;
+      const currentRequest = inFlightRef.current;
+      if (currentRequest?.address === normalizedAddress) {
+        currentRequest.controller.abort();
+      }
     };
-  }, [address, loadPortfolio]);
+  }, [address, loadPortfolio, refreshInBackground]);
+
+  useEffect(() => {
+    if (
+      !address ||
+      nextPollAtMs == null ||
+      isOffline ||
+      !isPageVisible
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void refreshInBackground(address);
+    }, Math.max(0, nextPollAtMs - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [
+    address,
+    isOffline,
+    isPageVisible,
+    nextPollAtMs,
+    refreshInBackground,
+  ]);
 
   const displayedPortfolio =
     portfolio?.address.toLowerCase() === address.toLowerCase() ? portfolio : null;
   const loadError =
     loadFailure?.address === address.toLowerCase() ? loadFailure.message : "";
   const isLoading = Boolean(address && !displayedPortfolio && !loadError);
+  const isBusy = refreshPhase !== "idle";
+  const isManualRefreshing = refreshPhase === "manual";
 
   useEffect(() => {
     if (!displayedPortfolio) return;
@@ -154,17 +331,28 @@ export function PositionTrackerDashboard({
   }, [displayedPortfolio]);
 
   function search(walletAddress: string) {
-    if (isRefreshing) return;
     if (walletAddress.toLowerCase() === address.toLowerCase()) {
-      void loadPortfolio(walletAddress);
+      void refresh();
       return;
     }
+    activeAddressRef.current = walletAddress.toLowerCase();
+    lastFreshAtRef.current = null;
+    consecutiveFailuresRef.current = 0;
+    setLastFreshAtMs(null);
+    setNextPollAtMs(null);
+    setBackgroundRefreshDelayed(false);
+    setLoadFailure(null);
     setAddress(walletAddress);
   }
 
   async function refresh() {
-    if (!address || isRefreshing) return;
-    await loadPortfolio(address, true);
+    if (!address || isBusy || !window.navigator.onLine) return;
+    setNextPollAtMs(null);
+    const success = await loadPortfolio(address, {
+      refresh: true,
+      kind: "manual",
+    });
+    scheduleAfterFreshAttempt(success);
   }
 
   return (
@@ -179,22 +367,8 @@ export function PositionTrackerDashboard({
             </Badge>
           }
           actions={
-            <div className="flex items-center gap-2">
-              <div className="hidden items-center px-2 py-2 text-[11px] text-slate-500 sm:flex">
-                Robinhood Chain
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Refresh portfolio"
-                disabled={!address || isRefreshing}
-                onClick={refresh}
-                className="border-white/[0.07] bg-white/[0.025] text-slate-400 hover:bg-white/[0.06] hover:text-white"
-              >
-                <RefreshCw
-                  className={cn("size-4", isRefreshing && "animate-spin")}
-                />
-              </Button>
+            <div className="hidden items-center px-2 py-2 text-[11px] text-slate-500 sm:flex">
+              Robinhood Chain
             </div>
           }
         />
@@ -233,11 +407,32 @@ export function PositionTrackerDashboard({
                   {formatCompactAddress(displayedPortfolio.address)}
                 </code>
               </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] text-slate-600">
+              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-[10px] text-slate-600">
                 <span className="flex items-center gap-1.5">
                   <Database className="size-3" />
                   Data by Krystal
                 </span>
+                <LiveRefreshStatus
+                  refreshPhase={refreshPhase}
+                  backgroundRefreshDelayed={backgroundRefreshDelayed}
+                  lastFreshAtMs={lastFreshAtMs}
+                  nowMs={nowMs}
+                />
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Refresh portfolio"
+                  disabled={isBusy || isOffline}
+                  onClick={refresh}
+                  className="border-white/[0.07] bg-white/[0.025] text-slate-400 hover:bg-white/[0.06] hover:text-white"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "size-3.5",
+                      isManualRefreshing && "animate-spin",
+                    )}
+                  />
+                </Button>
               </div>
             </div>
           )}
@@ -274,17 +469,17 @@ export function PositionTrackerDashboard({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={isRefreshing || isOffline}
+                  disabled={isBusy || isOffline}
                   onClick={refresh}
                   className="mt-4 border-rose-300/20 bg-rose-300/[0.06] text-rose-100 hover:bg-rose-300/10"
                 >
                   <RefreshCw
                     className={cn(
                       "size-3.5",
-                      isRefreshing && "animate-spin",
+                      isManualRefreshing && "animate-spin",
                     )}
                   />
-                  {isRefreshing ? "Trying again…" : "Try again"}
+                  {isManualRefreshing ? "Trying again…" : "Try again"}
                 </Button>
               </div>
             )}
@@ -332,27 +527,6 @@ export function PositionTrackerDashboard({
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                      <span
-                        role="status"
-                        aria-live="polite"
-                        className="flex items-center gap-1.5 text-[11px] text-slate-500"
-                      >
-                        {isRefreshing ? (
-                          <>
-                            <RefreshCw className="size-3.5 animate-spin text-violet-300" />
-                            Refreshing from Krystal...
-                          </>
-                        ) : (
-                          <>
-                            <Activity className="size-3.5 text-emerald-400" />
-                            Last synced{" "}
-                            {formatSyncAge(
-                              nowMs,
-                              displayedPortfolio.updatedAtMs,
-                            )}
-                          </>
-                        )}
-                      </span>
                       <span className="rounded-full border border-white/[0.06] bg-white/[0.025] px-3 py-1 text-xs text-slate-500">
                         {displayedPortfolio.positions.length} positions
                       </span>
@@ -394,5 +568,61 @@ export function PositionTrackerDashboard({
         </div>
       </main>
     </AppShell>
+  );
+}
+
+function isAbortError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  );
+}
+
+function LiveRefreshStatus({
+  refreshPhase,
+  backgroundRefreshDelayed,
+  lastFreshAtMs,
+  nowMs,
+}: {
+  refreshPhase: RefreshPhase;
+  backgroundRefreshDelayed: boolean;
+  lastFreshAtMs: number | null;
+  nowMs: number;
+}) {
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      className="flex items-center gap-1.5 border-l border-white/[0.07] pl-3 text-[11px] text-slate-500"
+    >
+      {refreshPhase === "manual" ? (
+        <>
+          <RefreshCw className="size-3.5 animate-spin text-violet-300" />
+          Refreshing from Krystal...
+        </>
+      ) : refreshPhase === "background" ? (
+        <>
+          <Activity className="size-3.5 animate-pulse text-violet-300" />
+          {lastFreshAtMs == null ? "Checking latest data…" : "Updating…"}
+        </>
+      ) : backgroundRefreshDelayed ? (
+        <>
+          <AlertTriangle className="size-3.5 text-amber-300" />
+          Live update delayed · Retrying…
+        </>
+      ) : lastFreshAtMs != null ? (
+        <>
+          <Activity className="size-3.5 text-emerald-400" />
+          Live · Updated {formatSyncAge(nowMs, lastFreshAtMs)}
+        </>
+      ) : (
+        <>
+          <Database className="size-3.5 text-slate-500" />
+          Cached snapshot
+        </>
+      )}
+    </span>
   );
 }

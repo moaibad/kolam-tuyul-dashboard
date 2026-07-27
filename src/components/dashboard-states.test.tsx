@@ -1,6 +1,12 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EmptyState } from "@/components/empty-state";
 import { PositionTrackerDashboard } from "@/components/position-tracker-dashboard";
@@ -15,6 +21,10 @@ vi.mock("@/lib/http-position-data-source", async () => {
 });
 
 describe("dashboard states", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders the initial empty state", () => {
     render(<EmptyState />);
     expect(
@@ -24,6 +34,7 @@ describe("dashboard states", () => {
 
   it("renders v3 and v4 live positions for a tracked address", async () => {
     const user = userEvent.setup();
+    const getPortfolio = vi.spyOn(httpPositionDataSource, "getPortfolio");
     render(
       <TooltipProvider>
         <PositionTrackerDashboard />
@@ -41,7 +52,19 @@ describe("dashboard states", () => {
     expect(screen.getByText("IN RANGE")).toBeInTheDocument();
     expect(screen.getByText("OUT OF RANGE")).toBeInTheDocument();
     expect(screen.getByText("Live data")).toBeInTheDocument();
-    expect(screen.getByText(/Last synced \d+s ago/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Live · Updated \d+s ago/, {}, { timeout: 2_000 }),
+    ).toBeInTheDocument();
+    expect(getPortfolio).toHaveBeenNthCalledWith(
+      1,
+      "0x0000000000000000000000000000000000000001",
+      expect.objectContaining({ refresh: false }),
+    );
+    expect(getPortfolio).toHaveBeenNthCalledWith(
+      2,
+      "0x0000000000000000000000000000000000000001",
+      expect.objectContaining({ refresh: true }),
+    );
   });
 
   it("keeps positions visible and shows a global status while refreshing", async () => {
@@ -58,12 +81,13 @@ describe("dashboard states", () => {
     );
     await user.click(screen.getByRole("button", { name: "Track positions" }));
     await screen.findByText("Uniswap v4", {}, { timeout: 2_000 });
-    await user.click(screen.getByRole("button", { name: "Track positions" }));
+    await screen.findByText(/Live · Updated/, {}, { timeout: 2_000 });
+    await user.click(screen.getByRole("button", { name: "Refresh portfolio" }));
 
     expect(screen.getByText("Refreshing from Krystal...")).toBeInTheDocument();
     expect(screen.getByText("Uniswap v4")).toBeInTheDocument();
     expect(
-      await screen.findByText(/Last synced \d+s ago/, {}, { timeout: 2_000 }),
+      await screen.findByText(/Live · Updated \d+s ago/, {}, { timeout: 2_000 }),
     ).toBeInTheDocument();
   });
 
@@ -91,22 +115,39 @@ describe("dashboard states", () => {
         screen.getByRole("button", { name: "Track positions" }),
       );
       await act(() => vi.advanceTimersByTimeAsync(450));
-      expect(getPortfolio).toHaveBeenCalledTimes(1);
+      expect(getPortfolio).toHaveBeenCalledTimes(2);
+      await act(() => vi.advanceTimersByTimeAsync(450));
+      expect(getPortfolio).toHaveBeenCalledTimes(2);
+      expect(getPortfolio).toHaveBeenNthCalledWith(
+        1,
+        "0x0000000000000000000000000000000000000001",
+        expect.objectContaining({ refresh: false }),
+      );
+      expect(getPortfolio).toHaveBeenNthCalledWith(
+        2,
+        "0x0000000000000000000000000000000000000001",
+        expect.objectContaining({ refresh: true }),
+      );
 
       Object.defineProperty(document, "visibilityState", {
         configurable: true,
         value: "hidden",
       });
-      await act(() => vi.advanceTimersByTimeAsync(89_550));
+      fireEvent(document, new Event("visibilitychange"));
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
 
-      expect(getPortfolio).toHaveBeenCalledTimes(1);
+      expect(getPortfolio).toHaveBeenCalledTimes(2);
       expect(screen.getByText("Uniswap v4")).toBeInTheDocument();
 
-      document.dispatchEvent(new Event("visibilitychange"));
-      expect(getPortfolio).toHaveBeenCalledTimes(1);
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "visible",
+      });
+      fireEvent(document, new Event("visibilitychange"));
+      expect(getPortfolio).toHaveBeenCalledTimes(3);
 
       await act(() => vi.advanceTimersByTimeAsync(450));
-      expect(screen.getByText(/Last synced/)).toBeInTheDocument();
+      expect(screen.getByText(/Live · Updated/)).toBeInTheDocument();
     } finally {
       getPortfolio.mockRestore();
       if (visibilityDescriptor) {
@@ -118,5 +159,134 @@ describe("dashboard states", () => {
       }
       vi.useRealTimers();
     }
+  });
+
+  it("polls fresh data every 30 seconds without overlapping requests", async () => {
+    vi.useFakeTimers();
+    const getPortfolio = vi.spyOn(httpPositionDataSource, "getPortfolio");
+
+    try {
+      render(
+        <TooltipProvider>
+          <PositionTrackerDashboard />
+        </TooltipProvider>,
+      );
+      fireEvent.change(screen.getByLabelText("Wallet address"), {
+        target: {
+          value: "0x0000000000000000000000000000000000000001",
+        },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "Track positions" }),
+      );
+
+      await act(() => vi.advanceTimersByTimeAsync(900));
+      expect(getPortfolio).toHaveBeenCalledTimes(2);
+
+      await act(() => vi.advanceTimersByTimeAsync(29_999));
+      expect(getPortfolio).toHaveBeenCalledTimes(2);
+      await act(() => vi.advanceTimersByTimeAsync(1));
+      expect(getPortfolio).toHaveBeenCalledTimes(3);
+      expect(getPortfolio).toHaveBeenLastCalledWith(
+        "0x0000000000000000000000000000000000000001",
+        expect.objectContaining({ refresh: true }),
+      );
+
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      expect(getPortfolio).toHaveBeenCalledTimes(3);
+      await act(() => vi.advanceTimersByTimeAsync(450));
+      expect(getPortfolio).toHaveBeenCalledTimes(4);
+    } finally {
+      getPortfolio.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("pauses while offline and refreshes immediately when connectivity returns", async () => {
+    vi.useFakeTimers();
+    const getPortfolio = vi.spyOn(httpPositionDataSource, "getPortfolio");
+    const onlineDescriptor = Object.getOwnPropertyDescriptor(
+      navigator,
+      "onLine",
+    );
+
+    try {
+      render(
+        <TooltipProvider>
+          <PositionTrackerDashboard />
+        </TooltipProvider>,
+      );
+      fireEvent.change(screen.getByLabelText("Wallet address"), {
+        target: {
+          value: "0x0000000000000000000000000000000000000001",
+        },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "Track positions" }),
+      );
+      await act(() => vi.advanceTimersByTimeAsync(900));
+      expect(getPortfolio).toHaveBeenCalledTimes(2);
+
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      fireEvent(window, new Event("offline"));
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      expect(getPortfolio).toHaveBeenCalledTimes(2);
+      expect(screen.getByText(/You’re offline/)).toBeInTheDocument();
+
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      fireEvent(window, new Event("online"));
+      expect(getPortfolio).toHaveBeenCalledTimes(3);
+    } finally {
+      getPortfolio.mockRestore();
+      if (onlineDescriptor) {
+        Object.defineProperty(navigator, "onLine", onlineDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, "onLine");
+      }
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the snapshot visible and shows a delayed status after background failure", async () => {
+    const { FixturePositionDataSource } = await import(
+      "@/test/portfolio-fixture"
+    );
+    const portfolio = await new FixturePositionDataSource(0).getPortfolio(
+      "0x0000000000000000000000000000000000000001",
+    );
+    const getPortfolio = vi
+      .spyOn(httpPositionDataSource, "getPortfolio")
+      .mockResolvedValueOnce(portfolio)
+      .mockRejectedValueOnce(new Error("Krystal unavailable"));
+
+    render(
+      <TooltipProvider>
+        <PositionTrackerDashboard />
+      </TooltipProvider>,
+    );
+    fireEvent.change(screen.getByLabelText("Wallet address"), {
+      target: {
+        value: "0x0000000000000000000000000000000000000001",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Track positions" }));
+
+    expect(await screen.findByText("Uniswap v4")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Live update delayed · Retrying…"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Uniswap v3")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Portfolio couldn’t be loaded"),
+    ).not.toBeInTheDocument();
+
+    await waitFor(() => expect(getPortfolio).toHaveBeenCalledTimes(2));
+    getPortfolio.mockRestore();
   });
 });

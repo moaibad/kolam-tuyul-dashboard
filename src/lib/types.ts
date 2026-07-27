@@ -78,6 +78,6 @@ export interface PortfolioSnapshot {
 export interface PositionDataSource {
   getPortfolio(
     address: string,
-    options?: { refresh?: boolean },
+    options?: { refresh?: boolean; signal?: AbortSignal },
   ): Promise<PortfolioSnapshot>;
 }

@@ -29,8 +29,9 @@ never requests a wallet connection, signature, private key, or seed phrase.
   metrics in USD.
 - Provides a Bangkok-time realized PnL calendar for closed positions during
   the latest 365 days.
-- Uses Krystal's cached snapshot for fast initial loads and requests a fresh
-  on-chain snapshot when the user presses refresh.
+- Uses Krystal's cached snapshot for fast initial loads, immediately
+  revalidates it, and polls a fresh snapshot every 30 seconds while the tracker
+  tab is visible and online.
 - Requires no database, RPC endpoint, API key, wallet connection, or secret.
 
 ## Requirements
