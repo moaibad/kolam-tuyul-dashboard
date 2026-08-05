@@ -78,8 +78,14 @@ const worker = {
       return errorResponse("Invalid wallet address.");
     }
 
-    if (chainIds !== "4663" || quoteSymbols !== "usd") {
-      return errorResponse("Unsupported chain or quote symbol.");
+    if (
+      (chainIds != null &&
+        !chainIds.split(",").every((chainId) =>
+          isInteger(chainId, 1, Number.MAX_SAFE_INTEGER),
+        )) ||
+      quoteSymbols !== "usd"
+    ) {
+      return errorResponse("Invalid chain or quote symbol.");
     }
 
     if (!isInteger(offset, 0, Number.MAX_SAFE_INTEGER)) {
@@ -108,10 +114,8 @@ const worker = {
     const upstreamUrl = new URL(UPSTREAM);
 
     for (const name of ALLOWED_PARAMS) {
-      upstreamUrl.searchParams.set(
-        name,
-        incoming.searchParams.get(name),
-      );
+      const value = incoming.searchParams.get(name);
+      if (value != null) upstreamUrl.searchParams.set(name, value);
     }
 
     try {

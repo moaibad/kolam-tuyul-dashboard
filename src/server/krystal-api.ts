@@ -10,11 +10,30 @@ import type {
 
 const DEFAULT_KRYSTAL_POSITIONS_URL =
   "https://api.krystal.app/all/v2/lp/userPositions";
-const ROBINHOOD_CHAIN_ID = 4663;
 const PAGE_SIZE = 500;
 const REQUEST_TIMEOUT_MS = 8_000;
-const SUPPORTED_PROTOCOLS = new Set(["uniswapv3", "uniswapv4"]);
-const EXPLORER_URL = "https://robinhoodchain.blockscout.com";
+
+const CHAIN_METADATA: Record<
+  number,
+  { name: string; explorerUrl?: string; explorerKind?: "blockscout" }
+> = {
+  1: { name: "Ethereum", explorerUrl: "https://etherscan.io" },
+  10: { name: "Optimism", explorerUrl: "https://optimistic.etherscan.io" },
+  56: { name: "BNB Chain", explorerUrl: "https://bscscan.com" },
+  137: { name: "Polygon", explorerUrl: "https://polygonscan.com" },
+  250: { name: "Fantom", explorerUrl: "https://ftmscan.com" },
+  324: { name: "zkSync Era", explorerUrl: "https://explorer.zksync.io" },
+  4663: {
+    name: "Robinhood Chain",
+    explorerUrl: "https://robinhoodchain.blockscout.com",
+    explorerKind: "blockscout",
+  },
+  8453: { name: "Base", explorerUrl: "https://basescan.org" },
+  42161: { name: "Arbitrum One", explorerUrl: "https://arbiscan.io" },
+  43114: { name: "Avalanche", explorerUrl: "https://snowtrace.io" },
+  59144: { name: "Linea", explorerUrl: "https://lineascan.build" },
+  81457: { name: "Blast", explorerUrl: "https://blastscan.io" },
+};
 
 export type KrystalPositionStatus = "open" | "closed";
 
@@ -55,7 +74,6 @@ export async function fetchKrystalPositions(input: {
     const url = new URL(krystalPositionsUrl());
     url.searchParams.set("addresses", input.walletAddress);
     url.searchParams.set("walletAddress", input.walletAddress);
-    url.searchParams.set("chainIds", String(ROBINHOOD_CHAIN_ID));
     url.searchParams.set("quoteSymbols", "usd");
     url.searchParams.set("offset", String(offset));
     url.searchParams.set("limit", String(PAGE_SIZE));
@@ -105,9 +123,7 @@ export async function fetchKrystalPositions(input: {
 
     if (!stats) {
       const statsByChain = asRecord(body.statsByChain);
-      stats =
-        asRecord(statsByChain?.[String(ROBINHOOD_CHAIN_ID)]) ??
-        asRecord(statsByChain?.all);
+      stats = asRecord(statsByChain?.all);
     }
 
     const expectedCount = numberValue(
@@ -134,22 +150,13 @@ export async function fetchKrystalPositions(input: {
   const unique = [
     ...new Map(
       positions.map((position, index) => [
-        stringValue(position.id) ??
-          `${stringValue(position.tokenAddress) ?? "unknown"}:${stringValue(position.tokenId) ?? index}`,
+        rawPositionIdentity(position, index),
         position,
       ]),
     ).values(),
   ];
-  const supported = unique.filter((position) => {
-    const protocol = protocolKey(position);
-    if (SUPPORTED_PROTOCOLS.has(protocol)) return true;
-    if (protocol) {
-      warnings.push(`Skipped unsupported Krystal protocol ${protocol}.`);
-    }
-    return false;
-  });
 
-  return { positions: supported, stats, warnings: [...new Set(warnings)] };
+  return { positions: unique, stats, warnings: [...new Set(warnings)] };
 }
 
 export function mapKrystalPortfolio(
@@ -170,42 +177,31 @@ export function mapKrystalPortfolio(
     }
   }
 
-  const stats = result.stats;
-  const depositedUsdg =
-    numberValue(stats?.totalDepositValue) ??
-    sum(positions.map((position) => position.depositedValueQuote));
-  const currentLiquidityUsdg =
-    numberValue(stats?.currentLiquidityValue) ??
-    sum(positions.map((position) => position.activeLpValueQuote));
-  const currentPositionUsdg =
-    numberValue(stats?.currentPositionValue) ??
-    sum(positions.map((position) => position.totalResultValueQuote));
-  const unclaimedFeesUsdg =
-    numberValue(stats?.unclaimedFees) ??
-    sum(positions.map((position) => position.unclaimedFeesValueQuote));
-  const totalFeeEarned =
-    numberValue(stats?.totalFeeEarned) ??
-    sum(
-      positions.map(
-        (position) =>
-          (position.claimedFeesValueQuote ?? 0) +
-          (position.unclaimedFeesValueQuote ?? 0),
-      ),
-    );
-  const claimedFeesUsdg = Math.max(0, totalFeeEarned - unclaimedFeesUsdg);
-  const profitLossUsdg =
-    numberValue(stats?.pnl) ??
-    sum(positions.map((position) => position.netLpResultQuote));
+  const depositedUsdg = sum(
+    positions.map((position) => position.depositedValueQuote),
+  );
+  const currentLiquidityUsdg = sum(
+    positions.map((position) => position.activeLpValueQuote),
+  );
+  const currentPositionUsdg = sum(
+    positions.map((position) => position.totalResultValueQuote),
+  );
+  const unclaimedFeesUsdg = sum(
+    positions.map((position) => position.unclaimedFeesValueQuote),
+  );
+  const claimedFeesUsdg = sum(
+    positions.map((position) => position.claimedFeesValueQuote),
+  );
+  const profitLossUsdg = sum(
+    positions.map((position) => position.netLpResultQuote),
+  );
   const calculatedRoi =
     depositedUsdg > 0 ? (profitLossUsdg / depositedUsdg) * 100 : null;
-  const profitLossPercent = normalizeReportedPercent(
-    stats?.returnOnInvestment,
-    calculatedRoi,
-  );
+  const profitLossPercent = calculatedRoi;
 
   return {
     address: walletAddress,
-    chainName: "Robinhood Chain",
+    chainName: "All Krystal chains",
     updatedAtMs: nowMs,
     dataSource: "krystal",
     positions,
@@ -228,8 +224,8 @@ export function mapKrystalPosition(
   raw: Record<string, unknown>,
 ): PositionSnapshot {
   const pool = requiredRecord(raw.pool, "pool");
-  const protocol = protocolKey(raw);
-  const version = versionFromProtocol(protocol);
+  const chain = chainFields(raw, pool);
+  const protocol = protocolFields(raw, pool);
   const currentAmounts = recordArray(raw.currentAmounts);
   const poolAmounts = recordArray(pool.tokenAmounts);
   const tokenEntries = currentAmounts.length >= 2 ? currentAmounts : poolAmounts;
@@ -269,17 +265,18 @@ export function mapKrystalPosition(
   const tokenAddress = requiredString(raw.tokenAddress, "tokenAddress");
   const tokenId = requiredString(raw.tokenId, "tokenId");
   const id =
-    stringValue(raw.id) ?? `${tokenAddress.toLowerCase()}-${tokenId}`;
+    `${chain.chainId}:${stringValue(raw.id) ?? `${tokenAddress.toLowerCase()}:${tokenId}`}`;
 
   return {
     id,
     tokenId,
-    version,
+    ...chain,
+    ...protocol,
     token0,
     token1,
     quoteToken: token1,
     quoteTokenPriceUsdg: tokenPriceUsdg(tokenEntries[1]!),
-    feeLabel: formatFeeLabel(pool.fees, version),
+    feeLabel: formatFeeLabel(pool.fees, protocol.protocolVersion),
     currentPrice,
     lowerPrice,
     upperPrice,
@@ -305,15 +302,29 @@ export function mapKrystalPosition(
     apr: numberValue(raw.apr),
     withdrawnUsdg: withdrawn,
     accountingStatus: "synced",
-    uniswapUrl: "https://app.uniswap.org/positions",
-    explorerUrl: `${EXPLORER_URL}/token/${tokenAddress}/instance/${tokenId}`,
+    positionUrl:
+      safeImageUrl(raw.positionUrl) ??
+      safeImageUrl(pool.positionUrl) ??
+      protocolPositionUrl(protocol.protocolKey),
+    explorerUrl:
+      safeImageUrl(raw.explorerUrl) ??
+      explorerPositionUrl(chain.chainId, tokenAddress, tokenId),
   };
 }
 
 export function krystalClosedPositionFields(raw: Record<string, unknown>) {
   const pool = requiredRecord(raw.pool, "pool");
-  const protocol = protocolKey(raw);
-  const version = versionFromProtocol(protocol);
+  const chain = chainFields(raw, pool);
+  const protocol = protocolFields(raw, pool);
+  const lowerPrice = requiredPositiveNumber(raw.minPrice, "minPrice");
+  const upperPrice = requiredPositiveNumber(raw.maxPrice, "maxPrice");
+  if (lowerPrice > upperPrice) throw new Error("price range is invalid");
+  if (
+    positiveNumberValue(pool.price) == null &&
+    positiveNumberValue(raw.currentPrice) == null
+  ) {
+    throw new Error("currentPrice is missing or invalid");
+  }
   const amounts = recordArray(raw.currentAmounts);
   const poolAmounts = recordArray(pool.tokenAmounts);
   const tokens = amounts.length >= 2 ? amounts : poolAmounts;
@@ -325,10 +336,11 @@ export function krystalClosedPositionFields(raw: Record<string, unknown>) {
 
   return {
     id:
-      stringValue(raw.id) ??
-      `${requiredString(raw.tokenAddress, "tokenAddress")}-${requiredString(raw.tokenId, "tokenId")}`,
+      `${chain.chainId}:${stringValue(raw.id) ??
+      `${requiredString(raw.tokenAddress, "tokenAddress")}:${requiredString(raw.tokenId, "tokenId")}`}`,
     pair: `${symbols[0]} / ${symbols[1]}`,
-    version,
+    ...chain,
+    ...protocol,
     closedAtMs: normalizeTimestamp(raw.closedTime),
     pnl: numberValue(raw.pnl) ?? 0,
     depositedUsdg: numberValue(raw.totalDepositValue) ?? 0,
@@ -381,7 +393,7 @@ function tokenPriceUsdg(entry: Record<string, unknown>) {
   return numberValue(quote?.price) ?? numberValue(asRecord(entry.token)?.price);
 }
 
-function formatFeeLabel(value: unknown, version: PositionVersion) {
+function formatFeeLabel(value: unknown, version?: PositionVersion) {
   const values = Array.isArray(value) ? value : [];
   const fee = values.map(numberValue).find((entry) => entry != null && entry > 0);
   if (fee == null) return version === "v4" ? "Dynamic" : "Unknown";
@@ -389,19 +401,101 @@ function formatFeeLabel(value: unknown, version: PositionVersion) {
   return `${percent.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}%`;
 }
 
-function protocolKey(position: Record<string, unknown>) {
+function rawPositionIdentity(position: Record<string, unknown>, index: number) {
   const pool = asRecord(position.pool);
+  const chainId =
+    numberValue(position.chainId) ??
+    numberValue(pool?.chainId) ??
+    numberValue(asRecord(position.chain)?.id) ??
+    "unknown";
+  return `${chainId}:${stringValue(position.id) ??
+    `${stringValue(position.tokenAddress) ?? "unknown"}:${stringValue(position.tokenId) ?? index}`}`;
+}
+
+function chainFields(raw: Record<string, unknown>, pool: Record<string, unknown>) {
+  const rawChain = asRecord(raw.chain);
+  const poolChain = asRecord(pool.chain);
+  const chainIdValue =
+    numberValue(raw.chainId) ??
+    numberValue(pool.chainId) ??
+    numberValue(rawChain?.id) ??
+    numberValue(poolChain?.id);
+  if (
+    chainIdValue == null ||
+    !Number.isSafeInteger(chainIdValue) ||
+    chainIdValue <= 0
+  ) {
+    throw new Error("chainId is missing or invalid");
+  }
+  const chainName =
+    stringValue(raw.chainName) ??
+    stringValue(pool.chainName) ??
+    stringValue(rawChain?.name) ??
+    stringValue(poolChain?.name) ??
+    CHAIN_METADATA[chainIdValue]?.name ??
+    `Chain ${chainIdValue}`;
+  return { chainId: chainIdValue, chainName };
+}
+
+function protocolFields(
+  raw: Record<string, unknown>,
+  pool: Record<string, unknown>,
+) {
+  const protocolKey =
+    stringValue(pool.projectKey)?.trim().toLowerCase() ??
+    stringValue(raw.projectKey)?.trim().toLowerCase() ??
+    stringValue(pool.project)?.replace(/\s+/g, "").toLowerCase() ??
+    "";
+  if (!protocolKey) throw new Error("protocol is missing");
+  const protocolVersion = protocolKey.match(/v\d+$/i)?.[0]?.toLowerCase();
+  const rawName =
+    stringValue(pool.project) ??
+    stringValue(pool.projectName) ??
+    stringValue(raw.projectName);
+  const baseKey = protocolVersion
+    ? protocolKey.slice(0, -protocolVersion.length)
+    : protocolKey;
+  const protocolName =
+    rawName
+      ?.trim()
+      .replace(/\s+v\d+$/i, "") || humanizeProtocol(baseKey);
+  return { protocolKey, protocolName, protocolVersion };
+}
+
+function humanizeProtocol(value: string) {
+  const known: Record<string, string> = {
+    uniswap: "Uniswap",
+    pancakeswap: "PancakeSwap",
+    sushiswap: "SushiSwap",
+    quickswap: "QuickSwap",
+    camelot: "Camelot",
+  };
   return (
-    stringValue(pool?.projectKey)?.toLowerCase() ??
-    stringValue(pool?.project)?.replace(/\s+/g, "").toLowerCase() ??
-    ""
+    known[value] ??
+    value.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   );
 }
 
-function versionFromProtocol(protocol: string): PositionVersion {
-  if (protocol === "uniswapv3") return "v3";
-  if (protocol === "uniswapv4") return "v4";
-  throw new Error(`unsupported protocol ${protocol || "unknown"}`);
+function protocolPositionUrl(protocolKey: string) {
+  if (protocolKey.startsWith("uniswap")) {
+    return "https://app.uniswap.org/positions";
+  }
+  if (protocolKey.startsWith("pancakeswap")) {
+    return "https://pancakeswap.finance/liquidity";
+  }
+  return undefined;
+}
+
+function explorerPositionUrl(
+  chainId: number,
+  tokenAddress: string,
+  tokenId: string,
+) {
+  const metadata = CHAIN_METADATA[chainId];
+  if (!metadata?.explorerUrl) return undefined;
+  return metadata.explorerKind === "blockscout"
+    ? `${metadata.explorerUrl}/token/${tokenAddress}/instance/${tokenId}`
+    : `${metadata.explorerUrl}/token/${tokenAddress}?a=${tokenId}`;
 }
 
 export function normalizeTimestamp(value: unknown) {

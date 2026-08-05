@@ -35,7 +35,11 @@ function calendar(pair = "WETH / USDC") {
               {
                 id: pair,
                 pair,
-                version: "v4" as const,
+                chainId: 56,
+                chainName: "BNB Chain",
+                protocolKey: "pancakeswapv3",
+                protocolName: "PancakeSwap",
+                protocolVersion: "v3",
                 pnl: 25,
                 kind: "closure" as const,
                 depositedUsdg: 100,
@@ -79,6 +83,8 @@ describe("PortfolioPnlCalendar Krystal loading", () => {
     await submitWallet(user);
 
     expect(await screen.findByText("WETH / USDC")).toBeInTheDocument();
+    expect(screen.getByText("PancakeSwap v3")).toBeInTheDocument();
+    expect(screen.getByText("BNB Chain")).toBeInTheDocument();
     expect(
       screen.getByText(
         "Showing closed positions since 2025-07-28 · Data by Krystal",

@@ -80,7 +80,11 @@ export function buildPortfolioCalendar(
     day.positions.push({
       id: position.id,
       pair: position.pair,
-      version: position.version,
+      chainId: position.chainId,
+      chainName: position.chainName,
+      protocolKey: position.protocolKey,
+      protocolName: position.protocolName,
+      protocolVersion: position.protocolVersion,
       pnl: position.pnl,
       kind: "closure",
       depositedUsdg: position.depositedUsdg,

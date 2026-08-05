@@ -1,4 +1,4 @@
-export type PositionVersion = "v3" | "v4";
+export type PositionVersion = string;
 export type RangeStatus = "in_range" | "out_of_range";
 export type AccountingStatus = "syncing" | "synced" | "partial" | "unavailable";
 
@@ -19,7 +19,11 @@ export interface TokenAmount {
 export interface PositionSnapshot {
   id: string;
   tokenId: string;
-  version: PositionVersion;
+  chainId: number;
+  chainName: string;
+  protocolKey: string;
+  protocolName: string;
+  protocolVersion?: PositionVersion;
   token0: TokenInfo;
   token1: TokenInfo;
   quoteToken: TokenInfo;
@@ -50,8 +54,8 @@ export interface PositionSnapshot {
   withdrawnUsdg?: number | null;
   accountingStatus: AccountingStatus;
   accountingError?: string;
-  uniswapUrl: string;
-  explorerUrl: string;
+  positionUrl?: string;
+  explorerUrl?: string;
 }
 
 export interface PortfolioSnapshot {

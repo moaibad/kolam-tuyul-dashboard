@@ -9,8 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --configLoader native --pool=vmThreads",
+    "test:watch": "vitest --configLoader native --pool=vmThreads"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

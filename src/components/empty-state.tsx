@@ -11,8 +11,8 @@ export function EmptyState() {
           Find your liquidity positions
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-500">
-          Enter any public EVM wallet address to view its Uniswap v3 and v4
-          position dashboard.
+          Enter any public EVM wallet address to view its multi-chain
+          concentrated-liquidity position dashboard.
         </p>
         <div className="mt-7 flex flex-wrap justify-center gap-2 text-[11px] text-slate-500">
           <span className="flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.025] px-3 py-1.5">

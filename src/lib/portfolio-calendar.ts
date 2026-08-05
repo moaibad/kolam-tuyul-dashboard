@@ -1,4 +1,3 @@
-export type CalendarPositionVersion = "v3" | "v4";
 export type RealizedEventKind = "closure";
 export type CalendarDataStatus =
   | "complete"
@@ -9,7 +8,11 @@ export type CalendarDataStatus =
 export interface CalendarPositionPnl {
   id: string;
   pair: string;
-  version: CalendarPositionVersion;
+  chainId: number;
+  chainName: string;
+  protocolKey: string;
+  protocolName: string;
+  protocolVersion?: string;
   pnl: number;
   kind?: RealizedEventKind;
   depositedUsdg?: number;

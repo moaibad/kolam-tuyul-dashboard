@@ -4,11 +4,23 @@ import type {
 } from "@/lib/portfolio-calendar";
 
 const positions = {
-  eth: { id: "eth-usdc-v4", pair: "ETH / USDC", version: "v4" },
-  wbtc: { id: "wbtc-usdc-v3", pair: "WBTC / USDC", version: "v3" },
-  arb: { id: "arb-eth-v3", pair: "ARB / ETH", version: "v3" },
-  index: { id: "index-usdg-v4", pair: "INDEX / USDG", version: "v4" },
+  eth: positionBase("eth-usdc-v4", "ETH / USDC", 1, "Ethereum", "uniswapv4", "Uniswap", "v4"),
+  wbtc: positionBase("wbtc-usdc-v3", "WBTC / USDC", 42161, "Arbitrum One", "uniswapv3", "Uniswap", "v3"),
+  arb: positionBase("arb-eth-v3", "ARB / ETH", 42161, "Arbitrum One", "camelotv3", "Camelot", "v3"),
+  index: positionBase("index-usdg-v4", "INDEX / USDG", 4663, "Robinhood Chain", "uniswapv4", "Uniswap", "v4"),
 } as const;
+
+function positionBase(
+  id: string,
+  pair: string,
+  chainId: number,
+  chainName: string,
+  protocolKey: string,
+  protocolName: string,
+  protocolVersion: string,
+) {
+  return { id, pair, chainId, chainName, protocolKey, protocolName, protocolVersion };
+}
 
 function position(
   base: Omit<CalendarPositionPnl, "pnl">,

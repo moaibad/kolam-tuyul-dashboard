@@ -13,7 +13,7 @@ const ADDRESS = "0x0000000000000000000000000000000000000001";
 describe("Krystal API adapter", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it("maps a Robinhood v3 position and derives stable USD metrics", () => {
+  it("maps a BNB Chain PancakeSwap position and derives stable USD metrics", () => {
     const portfolio = mapKrystalPortfolio(
       ADDRESS,
       {
@@ -36,14 +36,18 @@ describe("Krystal API adapter", () => {
     expect(portfolio.totals).toMatchObject({
       depositedUsdg: 100,
       currentLpValueUsdg: 115,
-      currentLiquidityUsdg: 112,
+      currentLiquidityUsdg: 4_100,
       claimedFeesUsdg: 2,
       unclaimedFeesUsdg: 3,
       profitLossUsdg: 15,
       profitLossPercent: 15,
     });
     expect(portfolio.positions[0]).toMatchObject({
-      version: "v3",
+      chainId: 56,
+      chainName: "BNB Chain",
+      protocolKey: "pancakeswapv3",
+      protocolName: "PancakeSwap",
+      protocolVersion: "v3",
       feeLabel: "0.05%",
       status: "in_range",
       depositedValueQuote: 100,
@@ -90,14 +94,46 @@ describe("Krystal API adapter", () => {
         position({ id: "zero-price", price: 0 }),
         position({ id: "zero-lower", minPrice: 0 }),
         position({ id: "inverted", minPrice: 2_500, maxPrice: 1_500 }),
+        { ...position({ id: "missing-chain" }), chainId: undefined },
       ],
       stats: null,
       warnings: [],
     });
 
     expect(portfolio.positions).toEqual([]);
-    expect(portfolio.warnings).toHaveLength(3);
+    expect(portfolio.warnings).toHaveLength(4);
     expect(portfolio.totals.partial).toBe(true);
+  });
+
+  it("keeps colliding Krystal IDs separate across chains", () => {
+    const portfolio = mapKrystalPortfolio(ADDRESS, {
+      positions: [
+        position({ id: "same", chainId: 1, projectKey: "uniswapv4" }),
+        position({ id: "same", chainId: 56, projectKey: "pancakeswapv3" }),
+      ],
+      stats: null,
+      warnings: [],
+    });
+
+    expect(portfolio.positions.map(({ id }) => id)).toEqual([
+      "1:same",
+      "56:same",
+    ]);
+  });
+
+  it("maps an unknown CLMM protocol without requiring a whitelist", () => {
+    const portfolio = mapKrystalPortfolio(ADDRESS, {
+      positions: [position({ projectKey: "newdexv3" })],
+      stats: null,
+      warnings: [],
+    });
+
+    expect(portfolio.positions[0]).toMatchObject({
+      protocolKey: "newdexv3",
+      protocolName: "Newdex",
+      protocolVersion: "v3",
+    });
+    expect(portfolio.positions[0].positionUrl).toBeUndefined();
   });
 
   it("accepts seconds, milliseconds, numeric strings, and ISO timestamps", () => {
@@ -113,7 +149,7 @@ describe("Krystal API adapter", () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       void input;
       return Response.json({
-        statsByChain: { "4663": { openPositionCount: 1 } },
+        statsByChain: { all: { openPositionCount: 1 } },
         positions: [position()],
       });
     });
@@ -142,7 +178,7 @@ describe("Krystal API adapter", () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       void input;
       return Response.json({
-        statsByChain: { "4663": { openPositionCount: 0 } },
+        statsByChain: { all: { openPositionCount: 0 } },
         positions: [],
       });
     });
@@ -161,7 +197,7 @@ describe("Krystal API adapter", () => {
     expect(requestedUrl.pathname).toBe("/user-positions");
     expect(requestedUrl.searchParams.get("addresses")).toBe(ADDRESS);
     expect(requestedUrl.searchParams.get("walletAddress")).toBe(ADDRESS);
-    expect(requestedUrl.searchParams.get("chainIds")).toBe("4663");
+    expect(requestedUrl.searchParams.has("chainIds")).toBe(false);
     expect(requestedUrl.searchParams.get("positionStatus")).toBe("open");
     expect(requestedUrl.searchParams.get("orderBy")).toBe("liquidity");
     expect(requestedUrl.searchParams.get("refreshAll")).toBe("true");
@@ -172,7 +208,7 @@ describe("Krystal API adapter", () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       void input;
       return Response.json({
-        statsByChain: { "4663": { closedPositionCount: 0 } },
+        statsByChain: { all: { closedPositionCount: 0 } },
         positions: [],
       });
     });
@@ -190,7 +226,7 @@ describe("Krystal API adapter", () => {
     expect(requestedUrl.searchParams.get("orderBy")).toBe("lastAction");
   });
 
-  it("paginates, deduplicates, and filters unsupported protocols", async () => {
+  it("paginates, deduplicates, and keeps every CLMM protocol", async () => {
     const firstPage = Array.from({ length: 500 }, (_, index) =>
       position({ id: `position-${index}` }),
     );
@@ -198,7 +234,7 @@ describe("Krystal API adapter", () => {
       .fn()
       .mockResolvedValueOnce(
         Response.json({
-          statsByChain: { "4663": { openPositionCount: 502 } },
+          statsByChain: { all: { openPositionCount: 502 } },
           positions: firstPage,
         }),
       )
@@ -220,10 +256,8 @@ describe("Krystal API adapter", () => {
 
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(String(fetcher.mock.calls[1]![0])).toContain("offset=500");
-    expect(result.positions).toHaveLength(501);
-    expect(result.warnings).toContain(
-      "Skipped unsupported Krystal protocol uniswapv2.",
-    );
+    expect(result.positions).toHaveLength(502);
+    expect(result.warnings).toEqual([]);
   });
 
   it("rejects malformed successful responses", async () => {
@@ -261,6 +295,7 @@ function position(
   overrides: {
     id?: string;
     projectKey?: string;
+    chainId?: number;
     price?: number;
     minPrice?: number;
     maxPrice?: number;
@@ -292,6 +327,7 @@ function position(
   };
   return {
     id: overrides.id ?? "position-1",
+    chainId: overrides.chainId ?? 56,
     tokenAddress: "0x0000000000000000000000000000000000000004",
     tokenId: "42",
     liquidity: "123",
@@ -315,7 +351,7 @@ function position(
     currentPositionValue: 115,
     status: "IN_RANGE",
     pool: {
-      projectKey: overrides.projectKey ?? "uniswapv3",
+      projectKey: overrides.projectKey ?? "pancakeswapv3",
       price: overrides.price ?? 2_000,
       fees: ["0.0005"],
       tokenAmounts: [token0, token1],

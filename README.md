@@ -15,14 +15,16 @@
 
 # KolamTuyul Dashboard
 
-A read-only dashboard for monitoring Uniswap v3 and v4 liquidity positions on
-Robinhood Chain. It reads public position data from Krystal through a
-server-side API and
+A read-only dashboard for monitoring concentrated-liquidity positions across
+the chains and protocols indexed by Krystal. It reads public position data
+through a server-side API and
 never requests a wallet connection, signature, private key, or seed phrase.
 
 ## Features
 
-- Discovers open Uniswap v3 and v4 positions for any public EVM address.
+- Discovers open CLMM positions across Krystal-supported chains and protocols
+  for any public EVM address.
+- Filters positions by chain and protocol while keeping portfolio totals global.
 - Displays current liquidity value, token composition, price range, and
   unclaimed fees.
 - Displays Krystal deposit, withdrawal, fee, APR, impermanent-loss, and PnL
@@ -64,7 +66,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### `GET /api/portfolio-calendar?address={EVM_ADDRESS}&month={YYYY-MM}`
 
-- Returns closed positions grouped by Krystal `closedTime` in Bangkok time.
+- Returns multi-chain closed CLMM positions grouped by Krystal `closedTime` in
+  Bangkok time, including chain and protocol identity.
 - Includes every day in the latest 365-day window, including the partial
   boundary months.
 - Uses Krystal's aggregate PnL, deposit, withdrawal, and claimed-fee values.

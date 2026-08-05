@@ -61,7 +61,7 @@ describe("dashboard states", () => {
     await user.click(screen.getByRole("button", { name: "Track positions" }));
 
     expect(await screen.findByText("Uniswap v4", {}, { timeout: 2_000 })).toBeInTheDocument();
-    expect(screen.getByText("Uniswap v3")).toBeInTheDocument();
+    expect(screen.getByText("PancakeSwap v3")).toBeInTheDocument();
     expect(screen.getByText("IN RANGE")).toBeInTheDocument();
     expect(screen.getByText("OUT OF RANGE")).toBeInTheDocument();
     expect(screen.getByText("Live data")).toBeInTheDocument();
@@ -82,6 +82,22 @@ describe("dashboard states", () => {
       "/?address=0x0000000000000000000000000000000000000001",
       { scroll: false },
     );
+
+    await user.selectOptions(screen.getByLabelText("Filter by chain"), "56");
+    expect(screen.queryByText("Uniswap v4")).not.toBeInTheDocument();
+    expect(screen.getByText("PancakeSwap v3")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 positions")).toBeInTheDocument();
+    expect(screen.getByText("Across 2 open positions")).toBeInTheDocument();
+
+    await user.selectOptions(
+      screen.getByLabelText("Filter by protocol"),
+      "uniswapv4",
+    );
+    expect(
+      screen.getByText("No positions match these filters"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByText("2 of 2 positions")).toBeInTheDocument();
   });
 
   it("prefills and automatically loads a valid initial address", async () => {
@@ -361,7 +377,7 @@ describe("dashboard states", () => {
     expect(
       await screen.findByText("Live update delayed · Retrying…"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Uniswap v3")).toBeInTheDocument();
+    expect(screen.getByText("PancakeSwap v3")).toBeInTheDocument();
     expect(
       screen.queryByText("Portfolio couldn’t be loaded"),
     ).not.toBeInTheDocument();

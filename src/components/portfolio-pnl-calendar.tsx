@@ -218,8 +218,8 @@ export function PortfolioPnlCalendar({
             Enter a wallet to build its realized PnL calendar
           </h3>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
-            Closed Uniswap positions will appear on their Krystal closing date
-            in Bangkok time.
+            Closed concentrated-liquidity positions will appear on their
+            Krystal closing date in Bangkok time.
           </p>
         </div>
       )}
@@ -585,9 +585,17 @@ function DayDetail({ day }: { day: PortfolioCalendarDay }) {
                     <p className="truncate text-sm font-medium text-slate-200">
                       {position.pair}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Uniswap {position.version}
-                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-slate-500">
+                      <span className="rounded-full border border-violet-400/15 px-2 py-0.5 text-violet-200/80">
+                        {position.protocolName}
+                        {position.protocolVersion
+                          ? ` ${position.protocolVersion}`
+                          : ""}
+                      </span>
+                      <span className="rounded-full border border-cyan-400/15 px-2 py-0.5 text-cyan-200/80">
+                        {position.chainName}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4 sm:min-w-[360px]">

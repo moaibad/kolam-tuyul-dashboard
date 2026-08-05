@@ -6,21 +6,29 @@ import {
   type PortfolioCalendarDay,
 } from "@/lib/portfolio-calendar";
 
+const IDENTITY = {
+  chainId: 1,
+  chainName: "Ethereum",
+  protocolKey: "uniswapv4",
+  protocolName: "Uniswap",
+  protocolVersion: "v4",
+};
+
 const days: PortfolioCalendarDay[] = [
   {
     date: "2026-07-01",
     positions: [
-      { id: "a", pair: "ETH / USDC", version: "v4", pnl: 30 },
-      { id: "b", pair: "WBTC / USDC", version: "v3", pnl: -10 },
+      { ...IDENTITY, id: "a", pair: "ETH / USDC", pnl: 30 },
+      { ...IDENTITY, id: "b", pair: "WBTC / USDC", pnl: -10 },
     ],
   },
   {
     date: "2026-07-02",
-    positions: [{ id: "a", pair: "ETH / USDC", version: "v4", pnl: 40 }],
+    positions: [{ ...IDENTITY, id: "a", pair: "ETH / USDC", pnl: 40 }],
   },
   {
     date: "2026-07-03",
-    positions: [{ id: "a", pair: "ETH / USDC", version: "v4", pnl: -15 }],
+    positions: [{ ...IDENTITY, id: "a", pair: "ETH / USDC", pnl: -15 }],
   },
   { date: "2026-07-04", positions: [] },
 ];

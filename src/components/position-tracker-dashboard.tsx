@@ -7,7 +7,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { DashboardPageHeader } from "@/components/dashboard-page-header";
@@ -60,6 +60,8 @@ export function PositionTrackerDashboard({
   const [backgroundRefreshDelayed, setBackgroundRefreshDelayed] =
     useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [chainFilter, setChainFilter] = useState("all");
+  const [protocolFilter, setProtocolFilter] = useState("all");
   const activeAddressRef = useRef(address);
   const onlineRef = useRef(
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -335,6 +337,48 @@ export function PositionTrackerDashboard({
     return () => window.clearInterval(interval);
   }, [displayedPortfolio]);
 
+  const chainOptions = useMemo(
+    () =>
+      [...new Map(
+        (displayedPortfolio?.positions ?? []).map((position) => [
+          String(position.chainId),
+          position.chainName,
+        ]),
+      )].sort((a, b) => a[1].localeCompare(b[1])),
+    [displayedPortfolio],
+  );
+  const protocolOptions = useMemo(
+    () =>
+      [...new Map(
+        (displayedPortfolio?.positions ?? []).map((position) => [
+          position.protocolKey,
+          `${position.protocolName}${position.protocolVersion ? ` ${position.protocolVersion}` : ""}`,
+        ]),
+      )].sort((a, b) => a[1].localeCompare(b[1])),
+    [displayedPortfolio],
+  );
+  const effectiveChainFilter =
+    chainFilter === "all" ||
+    chainOptions.some(([chainId]) => chainId === chainFilter)
+      ? chainFilter
+      : "all";
+  const effectiveProtocolFilter =
+    protocolFilter === "all" ||
+    protocolOptions.some(([protocolKey]) => protocolKey === protocolFilter)
+      ? protocolFilter
+      : "all";
+  const filteredPositions = useMemo(
+    () =>
+      (displayedPortfolio?.positions ?? []).filter(
+        (position) =>
+          (effectiveChainFilter === "all" ||
+            String(position.chainId) === effectiveChainFilter) &&
+          (effectiveProtocolFilter === "all" ||
+            position.protocolKey === effectiveProtocolFilter),
+      ),
+    [displayedPortfolio, effectiveChainFilter, effectiveProtocolFilter],
+  );
+
   function search(walletAddress: string) {
     router.replace(buildWalletHref("/", walletAddress), { scroll: false });
     if (walletAddress.toLowerCase() === address.toLowerCase()) {
@@ -366,7 +410,7 @@ export function PositionTrackerDashboard({
       <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden">
         <DashboardPageHeader
           title="Position Tracker"
-          subtitle="Monitor your Uniswap liquidity performance"
+          subtitle="Monitor your multi-chain liquidity performance"
           titleAccessory={
             <Badge className="border-violet-400/15 bg-violet-400/8 text-[9px] font-semibold tracking-wider text-violet-200 uppercase">
               {demoMode ? "Demo data" : "Live data"}
@@ -374,7 +418,7 @@ export function PositionTrackerDashboard({
           }
           actions={
             <div className="hidden items-center px-2 py-2 text-[11px] text-slate-500 sm:flex">
-              Robinhood Chain
+              All Krystal chains
             </div>
           }
         />
@@ -533,11 +577,46 @@ export function PositionTrackerDashboard({
                         Open positions
                       </h2>
                       <p className="mt-1 text-xs text-slate-600">
-                        Uniswap v3 and v4 positions in this wallet
+                        Concentrated-liquidity positions across Krystal chains
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
+                      <label className="sr-only" htmlFor="chain-filter">
+                        Filter by chain
+                      </label>
+                      <select
+                        id="chain-filter"
+                        value={effectiveChainFilter}
+                        onChange={(event) => setChainFilter(event.target.value)}
+                        className="h-8 rounded-lg border border-white/[0.08] bg-[#171426] px-3 text-xs text-slate-300 outline-none focus:border-violet-400/40"
+                      >
+                        <option value="all">All chains</option>
+                        {chainOptions.map(([chainId, chainName]) => (
+                          <option key={chainId} value={chainId}>
+                            Chain: {chainName}
+                          </option>
+                        ))}
+                      </select>
+                      <label className="sr-only" htmlFor="protocol-filter">
+                        Filter by protocol
+                      </label>
+                      <select
+                        id="protocol-filter"
+                        value={effectiveProtocolFilter}
+                        onChange={(event) =>
+                          setProtocolFilter(event.target.value)
+                        }
+                        className="h-8 rounded-lg border border-white/[0.08] bg-[#171426] px-3 text-xs text-slate-300 outline-none focus:border-violet-400/40"
+                      >
+                        <option value="all">All protocols</option>
+                        {protocolOptions.map(([protocolKey, protocolName]) => (
+                          <option key={protocolKey} value={protocolKey}>
+                            Protocol: {protocolName}
+                          </option>
+                        ))}
+                      </select>
                       <span className="rounded-full border border-white/[0.06] bg-white/[0.025] px-3 py-1 text-xs text-slate-500">
+                        {filteredPositions.length} of{" "}
                         {displayedPortfolio.positions.length} positions
                       </span>
                     </div>
@@ -548,13 +627,31 @@ export function PositionTrackerDashboard({
                         No open positions found
                       </h3>
                       <p className="mt-2 text-xs text-slate-500">
-                        This wallet has no open Uniswap v3 or v4 positions on
-                        Robinhood Chain.
+                        This wallet has no open concentrated-liquidity positions
+                        indexed by Krystal.
                       </p>
+                    </div>
+                  ) : filteredPositions.length === 0 ? (
+                    <div className="rounded-2xl border border-white/[0.055] bg-white/[0.018] p-8 text-center">
+                      <h3 className="text-sm font-medium text-slate-200">
+                        No positions match these filters
+                      </h3>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => {
+                          setChainFilter("all");
+                          setProtocolFilter("all");
+                        }}
+                      >
+                        Clear filters
+                      </Button>
                     </div>
                   ) : (
                     <div className="grid min-w-0 gap-4 xl:grid-cols-3">
-                      {[...displayedPortfolio.positions]
+                      {[...filteredPositions]
                         .sort((a, b) =>
                           a.status === b.status
                             ? 0

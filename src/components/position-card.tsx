@@ -74,7 +74,16 @@ export function PositionCard({
                   variant="outline"
                   className="border-violet-400/20 bg-violet-400/8 text-[10px] text-violet-200"
                 >
-                  Uniswap {position.version}
+                  {position.protocolName}
+                  {position.protocolVersion
+                    ? ` ${position.protocolVersion}`
+                    : ""}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="border-cyan-400/20 bg-cyan-400/8 text-[10px] text-cyan-200"
+                >
+                  {position.chainName}
                 </Badge>
               </div>
               <p className="mt-1 text-xs text-slate-500">
@@ -200,25 +209,29 @@ export function PositionCard({
             )}
           </div>
           <div className="flex gap-2">
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="flex-1 border-white/8 bg-white/[0.025] text-slate-300 hover:bg-white/[0.06] sm:flex-none"
-            >
-              <a href={position.explorerUrl} target="_blank" rel="noreferrer">
-                Explorer <ExternalLink className="size-3.5" />
-              </a>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              className="flex-1 bg-violet-500 text-white hover:bg-violet-400 sm:flex-none"
-            >
-              <a href={position.uniswapUrl} target="_blank" rel="noreferrer">
-                Open Uniswap <ArrowUpRight className="size-3.5" />
-              </a>
-            </Button>
+            {position.explorerUrl && (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="flex-1 border-white/8 bg-white/[0.025] text-slate-300 hover:bg-white/[0.06] sm:flex-none"
+              >
+                <a href={position.explorerUrl} target="_blank" rel="noreferrer">
+                  Explorer <ExternalLink className="size-3.5" />
+                </a>
+              </Button>
+            )}
+            {position.positionUrl && (
+              <Button
+                asChild
+                size="sm"
+                className="flex-1 bg-violet-500 text-white hover:bg-violet-400 sm:flex-none"
+              >
+                <a href={position.positionUrl} target="_blank" rel="noreferrer">
+                  Open {position.protocolName} <ArrowUpRight className="size-3.5" />
+                </a>
+              </Button>
+            )}
           </div>
         </footer>
       </div>

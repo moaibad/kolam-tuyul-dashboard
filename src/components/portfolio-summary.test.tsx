@@ -9,7 +9,7 @@ function portfolio(
 ): PortfolioSnapshot {
   return {
     address: "0x0000000000000000000000000000000000000001",
-    chainName: "Robinhood Chain",
+    chainName: "All Krystal chains",
     updatedAtMs: Date.now(),
     positions: [
       { status: "in_range" },

@@ -2,7 +2,6 @@ import type {
   PortfolioSnapshot,
   PositionDataSource,
   PositionSnapshot,
-  PositionVersion,
   RangeStatus,
 } from "@/lib/types";
 
@@ -15,12 +14,16 @@ const USDG = {
 function position(
   overrides: Partial<PositionSnapshot> & {
     id: string;
-    version: PositionVersion;
     status: RangeStatus;
   },
 ): PositionSnapshot {
   return {
     tokenId: "123456",
+    chainId: 4663,
+    chainName: "Robinhood Chain",
+    protocolKey: "uniswapv4",
+    protocolName: "Uniswap",
+    protocolVersion: "v4",
     token0: {
       address: "0xA1b2c3D4e5F60718293a4B5c6D7e8F9012345678",
       symbol: "INDEX",
@@ -65,7 +68,7 @@ function position(
     netLpResultQuote: 869.14,
     netLpResultPercent: 43.46,
     accountingStatus: "synced",
-    uniswapUrl: "https://app.uniswap.org/portfolio",
+    positionUrl: "https://app.uniswap.org/portfolio",
     explorerUrl: "https://robinhoodchain.blockscout.com",
     ...overrides,
   };
@@ -74,18 +77,23 @@ function position(
 function createPortfolio(address: string, updatedAtMs: number): PortfolioSnapshot {
   return {
     address,
-    chainName: "Robinhood Chain",
+    chainName: "All Krystal chains",
     blockNumber: "38291407",
     updatedAtMs,
     positions: [
       position({
         id: "v4:position-manager:123456",
-        version: "v4",
+        protocolVersion: "v4",
         status: "in_range",
       }),
       position({
         id: "v3:position-manager:98721",
-        version: "v3",
+        chainId: 56,
+        chainName: "BNB Chain",
+        protocolKey: "pancakeswapv3",
+        protocolName: "PancakeSwap",
+        protocolVersion: "v3",
+        positionUrl: "https://pancakeswap.finance/liquidity",
         status: "out_of_range",
         tokenId: "98721",
         token0: {

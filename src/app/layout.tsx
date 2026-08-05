@@ -22,7 +22,7 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "Position Tracker | KolamTuyul",
   description:
-    "Track Uniswap liquidity positions on Robinhood Chain without connecting a wallet.",
+    "Track concentrated-liquidity positions across Krystal chains and protocols without connecting a wallet.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

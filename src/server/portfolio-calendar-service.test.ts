@@ -26,7 +26,7 @@ describe("Krystal portfolio calendar", () => {
       days: [
         {
           date: "2025-07-28",
-          positions: [expect.objectContaining({ id: "window-start" })],
+          positions: [expect.objectContaining({ id: "56:window-start" })],
         },
       ],
     });
@@ -38,9 +38,13 @@ describe("Krystal portfolio calendar", () => {
         status: "complete",
         positions: [
           expect.objectContaining({
-            id: "inside",
+            id: "56:inside",
             pair: "WETH / USDC",
-            version: "v4",
+            chainId: 56,
+            chainName: "BNB Chain",
+            protocolKey: "pancakeswapv3",
+            protocolName: "PancakeSwap",
+            protocolVersion: "v3",
             pnl: 12,
             depositedUsdg: 100,
             withdrawnUsdg: 110,
@@ -78,6 +82,10 @@ function closedPosition(id: string, closedTime: string) {
     id,
     tokenAddress: "0x0000000000000000000000000000000000000004",
     tokenId: id,
+    chainId: 56,
+    minPrice: 1_500,
+    maxPrice: 2_500,
+    currentPrice: 2_000,
     currentAmounts: amounts,
     closedTime,
     pnl: 12,
@@ -90,7 +98,8 @@ function closedPosition(id: string, closedTime: string) {
       },
     ],
     pool: {
-      projectKey: "uniswapv4",
+      projectKey: "pancakeswapv3",
+      price: 2_000,
       tokenAmounts: amounts,
     },
   };
